@@ -33,3 +33,7 @@ module.exports = {
     ...
 };
 ```
+
+To get the `consumer_key`, `consumer_secret`, `access_token`, and `access_token_secret` values, you'll need to sign up for a [Twitter Developer account](https://developer.twitter.com/en).
+
+To get the `lowerLatitude`, `lowerLongitude`, `upperLatitude`, and `upperLongitude` values, you'll need to go to the [Citizen explore page](https://citizen.com/explore). Open up the developer tools in your browser, go to the network tab, and select the city you want to see incidents for. Select the `trending` API call and the latitude and longitude values are the parameters in the URL.
