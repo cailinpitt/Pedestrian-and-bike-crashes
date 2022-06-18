@@ -94,9 +94,15 @@ const filterIncidents = (allIncidents) => {
     const relevantIncidents = allIncidents
         .filter(x => 
             x.raw.toLowerCase().includes("pedestrian") ||
-            x.raw.toLowerCase().includes("pedestrian") ||
+            x.raw.toLowerCase().includes("bicyclist") ||
+            x.raw.toLowerCase().includes("struck by vehicle") ||
+            x.raw.toLowerCase().includes("bicycle") ||
+            x.raw.toLowerCase().includes("scooter") ||
+            x.title.toLowerCase().includes("pedestrian") ||
             x.title.toLowerCase().includes("bicyclist") ||
-            x.title.toLowerCase().includes("bicyclist")
+            x.title.toLowerCase().includes("struck by vehicle") ||
+            x.title.toLowerCase().includes("bicycle") ||
+            x.title.toLowerCase().includes("scooter")
         );
 
     // Get incidents with pedestrian or bicyuclist in an update
@@ -119,7 +125,7 @@ const filterIncidents = (allIncidents) => {
 
 const main = async () => {
     if (argv.location == undefined || argv.location == null) {
-        console.log("Location must be passed in (either atlanta or columbus)");
+        console.log("Location must be passed in");
         return;
     }
 
