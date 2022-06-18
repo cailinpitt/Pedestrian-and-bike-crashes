@@ -68,6 +68,39 @@ const tweetIncident = async (client, incident) => {
     await client.v2.tweet(`${incident.raw}\n\n${incidentDate}`, { media: { media_ids: [ mediaId ]}});
 };
 
+/**
+ * Filters Citizen incidents and returns ones involving Pedestrian and Bicyclists.
+ * @param {Array} allIncidents an array of Citizen incidents
+ * @returns an array of Citizen incidents mentioning Pedestrians or Bicyclists.
+ */
+const filterIncidents = (allIncidents) => {
+    // Get incidents with pedestrian or bicyclist in the top level description
+    const relevantIncidents = allIncidents
+        .filter(x => 
+            x.raw.toLowerCase().includes("pedestrian") ||
+            x.raw.toLowerCase().includes("pedestrian") ||
+            x.title.toLowerCase().includes("bicyclist") ||
+            x.title.toLowerCase().includes("bicyclist")
+        );
+
+    // Get incidents with pedestrian or bicyuclist in an update
+    // It's possible an incident could have a description that doesn't involve a pedestrian
+    // or bicyclist but in a 911 update Citizen later learns they were involved
+    const incidentsWithRelevantUpdates = allIncidents
+        .filter(x => x.ts >= yesterdayTimestampInMs)
+        .filter(x => {
+            for (const updateObjectKey in x.updates) {
+                const updateText = x.updates[updateObjectKey].text.toLowerCase()
+                if (updateText.includes("pedestrian") || updateText.includes("bicyclist")) {
+                    return true
+                }
+            }
+            return false
+        });
+
+    return Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
+};
+
 const main = async () => {
     if (argv.location == undefined || argv.location == null) {
         console.log("Location must be passed in (either atlanta or columbus)");
@@ -84,29 +117,10 @@ const main = async () => {
 
     resetAssetsFolder();
 
-    const incidents = await fetchIncidents();
+    const allIncidents = await fetchIncidents();
+    const filteredIncidents = filterIncidents(allIncidents);
 
-    const relevantIncidents = incidents
-        .filter(x => 
-            x.raw.toLowerCase().includes("pedestrian") ||
-            x.raw.toLowerCase().includes("pedestrian") ||
-            x.title.toLowerCase().includes("bicyclist") ||
-            x.title.toLowerCase().includes("bicyclist")
-        );
-    const incidentsWithRelevantUpdates = incidents
-        .filter(x => x.ts >= yesterdayTimestampInMs)
-        .filter(x => {
-            for (const updateObjectKey in x.updates) {
-                const updateText = x.updates[updateObjectKey].text.toLowerCase()
-                if (updateText.includes("pedestrian") || updateText.includes("bicyclist")) {
-                    return true
-                }
-            }
-            return false
-        });
-    const union = Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
-
-    for (const incident of union) {
+    for (const incident of filteredIncidents) {
         await downloadMapImage(incident.shareMap, incident.key);
 
         await tweetIncident(client, incident)
