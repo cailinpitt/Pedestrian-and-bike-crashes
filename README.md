@@ -1,5 +1,7 @@
 A Twitter bot that tweets Bicyclist and Pedestrian related crashes, using Citizen data.
 
+![Tweet screenshot](example.png)
+
 ### Run
 `npm install` to fetch and install dependencies.
 
