@@ -1,6 +1,5 @@
 const keys = require('./keys.js');
 const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs-extra');
 const { TwitterApi } = require('twitter-api-v2');
@@ -57,15 +56,30 @@ const resetAssetsFolder = () => {
 };
 
 /**
- * Tweets information on a Citizen incident that includes a Pedestrian or Bicyclist
+ * Tweets thread on a Citizen incident that includes a Pedestrian or Bicyclist
  * @param {*} client the instantiated Twitter client
  * @param {*} incident the Citizen incident to tweet
  */
-const tweetIncident = async (client, incident) => {
+const tweetIncidentThread = async (client, incident) => {
     const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
+    const tweets = [];
+
+    // Upload map image and add alt text
     const mediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
     await client.v1.createMediaMetadata(mediaId, { alt_text: { text: `A photo of a map at ${incident.address}` } });
-    await client.v2.tweet(`${incident.raw}\n\n${incidentDate}`, { media: { media_ids: [ mediaId ]}});
+
+    // Add initial tweet with map image linked
+    tweets.push({ text: `${incident.raw}\n\n${incidentDate}`, media: { media_ids: [ mediaId ]}})
+
+
+    for (const updateKey in incident.updates) {
+        if (incident.updates[updateKey].type != 'ROOT') {
+            const updateTime = new Date(incident.updates[updateKey].ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
+            tweets.push(`${incident.updates[updateKey].text}\n\n${updateTime}`)
+        }
+    }
+
+    await client.v2.tweetThread(tweets);
 };
 
 /**
@@ -124,7 +138,7 @@ const main = async () => {
     for (const incident of filteredIncidents) {
         await downloadMapImage(incident.shareMap, incident.key);
 
-        await tweetIncident(client, incident)
+        await tweetIncidentThread(client, incident)
 
         // wait one minute to prevent rate limiting
         await delay(60000);
