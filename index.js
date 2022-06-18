@@ -6,7 +6,7 @@ const fs = require('fs-extra');
 const { TwitterApi } = require('twitter-api-v2');
 const argv = require('minimist')(process.argv.slice(2));
 
-const assetDirectory = `./assets-${argv.location}-${uuidv4()}`;
+const assetDirectory = `./assets-${argv.location}`;
 
 /**
  * Temporarily halts program execution.
@@ -74,6 +74,8 @@ const tweetIncident = async (client, incident) => {
  * @returns an array of Citizen incidents mentioning Pedestrians or Bicyclists.
  */
 const filterIncidents = (allIncidents) => {
+    const yesterdayTimestampInMs = Date.now() - 86400000;
+
     // Get incidents with pedestrian or bicyclist in the top level description
     const relevantIncidents = allIncidents
         .filter(x => 
@@ -113,7 +115,6 @@ const main = async () => {
         accessToken: keys[argv.location].access_token,
         accessSecret: keys[argv.location].access_token_secret,
     });
-    const yesterdayTimestampInMs = Date.now() - 86400000;
 
     resetAssetsFolder();
 
