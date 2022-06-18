@@ -38,7 +38,7 @@ const resetAssetsFolder = () => {
 };
 
 const tweetIncident = async (client, incident) => {
-    const incidentDate = new Date(incident.ts).toLocaleString("en-US");
+    const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
     const mediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
     await client.v1.createMediaMetadata(mediaId, { alt_text: { text: `A photo of a map at ${incident.address}` } });
     await client.v2.tweet(`${incident.raw}\n\n${incidentDate}`, { media: { media_ids: [ mediaId ]}});
