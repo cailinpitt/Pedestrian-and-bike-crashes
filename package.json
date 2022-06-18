@@ -1,0 +1,28 @@
+{
+  "name": "pedestrian-and-bike-crashes",
+  "version": "1.0.0",
+  "description": "Twitter both that tweets incidents involving pedestrians and bicyclists",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cailinpitt/Pedestrian-and-bike-crashes.git"
+  },
+  "author": "cailinpitt1@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cailinpitt/Pedestrian-and-bike-crashes/issues"
+  },
+  "homepage": "https://github.com/cailinpitt/Pedestrian-and-bike-crashes#readme",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "fs-extra": "^10.1.0",
+    "minimist": "^1.2.6",
+    "path": "^0.12.7",
+    "twitter": "^1.7.1",
+    "twitter-api-v2": "^1.12.2",
+    "uuid": "^8.3.2"
+  }
+}
