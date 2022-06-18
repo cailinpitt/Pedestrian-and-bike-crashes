@@ -6,7 +6,7 @@ const fs = require('fs-extra');
 const { TwitterApi } = require('twitter-api-v2');
 const argv = require('minimist')(process.argv.slice(2));
 
-const assetDirectory = `./assets-${uuidv4()}`;
+const assetDirectory = `./assets-${argv.location}-${uuidv4()}`;
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -33,12 +33,7 @@ const downloadMapImage = async (url, eventKey) => {
 };
 
 const resetAssetsFolder = () => {
-    const assetPath = './'
-    let regex = /assets-*/
-    fs.readdirSync(assetPath)
-    .filter(f => regex.test(f))
-    .map(f => fs.removeSync(assetPath + f));
-
+    fs.removeSync(assetDirectory);
     fs.ensureDirSync(assetDirectory);
 };
 
