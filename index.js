@@ -83,6 +83,18 @@ const tweetIncidentThread = async (client, incident) => {
 };
 
 /**
+ * Tweets number of relevant Citizen incidents over the last 24 hours.
+ * @param {*} client the instantiated Twitter client
+ * @param {*} numIncidents the number of relevant Citizen incidents
+ */
+const tweetSummaryOfLast24Hours = async (client, numIncidents) => {
+    await client.v2.tweetThread([
+        `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`, 
+        'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
+    ]);
+}
+
+/**
  * Filters Citizen incidents and returns ones involving Pedestrian and Bicyclists.
  * @param {Array} allIncidents an array of Citizen incidents
  * @returns an array of Citizen incidents mentioning Pedestrians or Bicyclists.
@@ -90,8 +102,9 @@ const tweetIncidentThread = async (client, incident) => {
 const filterIncidents = (allIncidents) => {
     const yesterdayTimestampInMs = Date.now() - 86400000;
 
-    // Get incidents with pedestrian or bicyclist in the top level description
+    // Get incidents from the last 24 hours with pedestrian or bicyclist in the top level description
     const relevantIncidents = allIncidents
+        .filter(x => x.ts >= yesterdayTimestampInMs)
         .filter(x => 
             x.raw.toLowerCase().includes("pedestrian") ||
             x.raw.toLowerCase().includes("bicyclist") ||
@@ -105,7 +118,7 @@ const filterIncidents = (allIncidents) => {
             x.title.toLowerCase().includes("scooter")
         );
 
-    // Get incidents with pedestrian or bicyuclist in an update
+    // Get incidents from the last 24 hours with pedestrian or bicyuclist in an update
     // It's possible an incident could have a description that doesn't involve a pedestrian
     // or bicyclist but in a 911 update Citizen later learns they were involved
     const incidentsWithRelevantUpdates = allIncidents
@@ -113,7 +126,13 @@ const filterIncidents = (allIncidents) => {
         .filter(x => {
             for (const updateObjectKey in x.updates) {
                 const updateText = x.updates[updateObjectKey].text.toLowerCase()
-                if (updateText.includes("pedestrian") || updateText.includes("bicyclist")) {
+                if (
+                    updateText.includes("pedestrian") || 
+                    updateText.includes("bicyclist") || 
+                    updateText.includes("struck by vehicle") || 
+                    updateText.includes("bicycle") ||
+                    updateText.includes("scooter")
+                ) {
                     return true
                 }
             }
@@ -141,13 +160,15 @@ const main = async () => {
     const allIncidents = await fetchIncidents();
     const filteredIncidents = filterIncidents(allIncidents);
 
+    await tweetSummaryOfLast24Hours(client, allIncidents.length);
+
     for (const incident of filteredIncidents) {
-        await downloadMapImage(incident.shareMap, incident.key);
-
-        await tweetIncidentThread(client, incident)
-
         // wait one minute to prevent rate limiting
         await delay(60000);
+
+        await downloadMapImage(incident.shareMap, incident.key);
+
+        await tweetIncidentThread(client, incident);
     }
 };
 
