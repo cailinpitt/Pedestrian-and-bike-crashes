@@ -160,7 +160,7 @@ const main = async () => {
     const allIncidents = await fetchIncidents();
     const filteredIncidents = filterIncidents(allIncidents);
 
-    await tweetSummaryOfLast24Hours(client, allIncidents.length);
+    await tweetSummaryOfLast24Hours(client, filteredIncidents.length);
 
     for (const incident of filteredIncidents) {
         // wait one minute to prevent rate limiting
