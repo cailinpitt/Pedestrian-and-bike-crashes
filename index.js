@@ -1,4 +1,5 @@
 const keys = require('./keys.js');
+const representatives = require('./representatives.js');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs-extra');
@@ -79,6 +80,14 @@ const tweetIncidentThread = async (client, incident) => {
         }
     }
 
+    if (argv.tweetReps) {
+        if (representatives[argv.location] && representatives[argv.location][incident.police]) {
+            const zoneRepInfo = representatives[argv.location][incident.police];
+
+            tweets.push(`This incident occurred in ${incident.police}, which covers ${representatives[argv.location].pluralTerm} ${zoneRepInfo.districts.join(', ')}\n\nRepresentative twitter accounts: ${zoneRepInfo.representativeTwitterAccounts.join(', ')}`)
+        }
+    }
+
     await client.v2.tweetThread(tweets);
 };
 
@@ -89,11 +98,20 @@ const tweetIncidentThread = async (client, incident) => {
  */
 const tweetSummaryOfLast24Hours = async (client, numIncidents) => {
     const sentenceStart = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes`;
-    
-    await client.v2.tweetThread([
+    const tweets = [
         `${sentenceStart} found over the last 24 hours.`, 
         'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
-    ]);
+    ];
+
+    if (numIncidents > 0 && argv.tweetReps) {
+        if (representatives[argv.location] && representatives[argv.location].atLarge) {
+            const atLargeRepInfo = representatives[argv.location].atLarge;
+
+            tweets.push(`CC at large city council representatives and president ${atLargeRepInfo.representativeTwitterAccounts.join(', ')}`);
+        }
+    }
+
+    await client.v2.tweetThread(tweets);
 }
 
 /**
