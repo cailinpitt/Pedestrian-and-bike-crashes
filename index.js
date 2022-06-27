@@ -108,6 +108,12 @@ const filterIncidents = (allIncidents) => {
     const relevantIncidents = allIncidents
         .filter(x => x.ts >= yesterdayTimestampInMs)
         .filter(x => 
+            !x.raw.toLowerCase().includes("robbed") &&
+            !x.raw.toLowerCase().includes("burglary") &&
+            !x.title.toLowerCase().includes("robbed") &&
+            !x.title.toLowerCase().includes("burglary")
+        )
+        .filter(x => 
             x.raw.toLowerCase().includes("pedestrian") ||
             x.raw.toLowerCase().includes("bicyclist") ||
             x.raw.toLowerCase().includes("struck by vehicle") ||
@@ -129,6 +135,13 @@ const filterIncidents = (allIncidents) => {
             for (const updateObjectKey in x.updates) {
                 const updateText = x.updates[updateObjectKey].text.toLowerCase()
                 if (
+                    updateText.includes("robbed") ||
+                    updateText.includes("burglary") ||
+                    updateText.includes("breaking into")
+                ) {
+                    return false
+                }
+                else if (
                     updateText.includes("pedestrian") || 
                     updateText.includes("bicyclist") || 
                     updateText.includes("struck by vehicle") || 
