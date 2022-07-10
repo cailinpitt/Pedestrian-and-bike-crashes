@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs-extra');
 const { TwitterApi } = require('twitter-api-v2');
 const argv = require('minimist')(process.argv.slice(2));
+const turf = require('@turf/turf');
+const assert = require('node:assert/strict');
 
 const assetDirectory = `./assets-${argv.location}`;
 
@@ -26,7 +28,25 @@ const fetchIncidents = async () => {
         method: 'GET',
     });
 
-    return response.data.results
+    return response.data.results;
+};
+
+/**
+ * Makes a GET request to download a geojson file of City Council Districts.
+ * @param {String} url url of the geojson file to download
+ * @returns resolved promise.
+ */
+ const downloadCityCouncilPolygons = async (url) => {
+    const geojsonPath = path.resolve(__dirname, `${assetDirectory}/city_council_districts.geojson`);
+    const writer = fs.createWriteStream(geojsonPath);
+
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream'
+    });
+    
+    return new Promise(resolve => response.data.pipe(writer).on('finish', resolve));
 };
 
 /**
@@ -47,6 +67,32 @@ const downloadMapImage = async (url, eventKey) => {
     
     return new Promise(resolve => response.data.pipe(writer).on('finish', resolve));
 };
+
+const mapCoordinateToCityCouncilDistrict = (coordinate, cityCouncilFeatures) => {
+    for (let i = 0; i < cityCouncilFeatures.length; i++) {
+        if (turf.booleanPointInPolygon(coordinate, cityCouncilFeatures[i])) {
+            return cityCouncilFeatures[i].properties.NAME;
+        }
+    }
+
+    return null;
+};
+
+const mapIncidentsToCityCouncilDistricts = (incidents) => {
+    const cityCouncilFeatureCollection = turf.featureCollection(
+            JSON.parse(fs.readFileSync(`${assetDirectory}/city_council_districts.geojson`))
+        ).features.features;
+
+    return incidents.map(x => {
+        return {
+            ...x,
+            cityCouncilDistrict: mapCoordinateToCityCouncilDistrict(
+                    turf.point([x.longitude, x.latitude]), 
+                    cityCouncilFeatureCollection
+                ),
+        }
+    });
+}
 
 /**
  * Deletes asset folder from disk, and then re-creates it.
@@ -80,12 +126,9 @@ const tweetIncidentThread = async (client, incident) => {
         }
     }
 
-    if (argv.tweetReps) {
-        if (representatives[argv.location] && representatives[argv.location][incident.police]) {
-            const zoneRepInfo = representatives[argv.location][incident.police];
-
-            tweets.push(`This incident occurred in ${incident.police}, which covers ${representatives[argv.location].pluralTerm} ${zoneRepInfo.districts.join(', ')}\n\nRepresentative twitter accounts: ${zoneRepInfo.representativeTwitterAccounts.join(', ')}`)
-        }
+    if (argv.tweetReps && representatives[argv.location][incident.cityCouncilDistrict] && incident.cityCouncilDistrict) {
+        const representative = representatives[argv.location][incident.cityCouncilDistrict];
+        tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
     }
 
     await client.v2.tweetThread(tweets);
@@ -94,22 +137,31 @@ const tweetIncidentThread = async (client, incident) => {
 /**
  * Tweets number of relevant Citizen incidents over the last 24 hours.
  * @param {*} client the instantiated Twitter client
- * @param {*} numIncidents the number of relevant Citizen incidents
+ * @param {*} incidents the relevant Citizen incidents
  */
-const tweetSummaryOfLast24Hours = async (client, numIncidents) => {
+const tweetSummaryOfLast24Hours = async (client, incidents) => {
+    const numIncidents = incidents.length;
     const sentenceStart = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes`;
     const tweets = [
-        `${sentenceStart} found over the last 24 hours.`, 
-        'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
+        `${sentenceStart} found over the last 24 hours.`
     ];
 
     if (numIncidents > 0 && argv.tweetReps) {
-        if (representatives[argv.location] && representatives[argv.location].atLarge) {
-            const atLargeRepInfo = representatives[argv.location].atLarge;
+        const lf = new Intl.ListFormat('en');
 
-            tweets.push(`CC at large city council representatives and president ${atLargeRepInfo.representativeTwitterAccounts.join(', ')}`);
+        if (argv.tweetReps) {
+            const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))];
+            const districtSentenceStart = numIncidents === 1? `The crash occurred in ${representatives[argv.location].repesentativeDistrictTerm}` : `The crashes occurred in ${representatives[argv.location].repesentativeDistrictTerm}s`;
+            tweets.push(`${districtSentenceStart} ${lf.format(districts)}`);
+        }
+
+        if (argv.tweetReps && representatives[argv.location].atLarge) {
+            const atLargeRepInfo = representatives[argv.location].atLarge;
+            tweets.push(`At large city council representatives and president: ${lf.format(atLargeRepInfo.representatives)}`);
         }
     }
+
+    tweets.push('Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.')
 
     await client.v2.tweetThread(tweets);
 }
@@ -175,11 +227,19 @@ const filterIncidents = (allIncidents) => {
     return Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
 };
 
-const main = async () => {
-    if (argv.location == undefined || argv.location == null) {
-        console.log("Location must be passed in");
-        return;
+const validateInputs = () => {
+    assert.notEqual(argv.location, undefined, 'location must be passed in');
+    assert.notEqual(keys[argv.location], undefined, 'keys file must have location information');
+    
+    if (argv.tweetReps) {
+        assert.notEqual(representatives[argv.location], undefined, 'must have representative info for location if calling with tweetReps flag');
+        assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
+        assert.notEqual(representatives[argv.location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
     }
+}
+
+const main = async () => {
+    validateInputs()
 
     const client = new TwitterApi({
         appKey: keys[argv.location].consumer_key,
@@ -191,9 +251,14 @@ const main = async () => {
     resetAssetsFolder();
 
     const allIncidents = await fetchIncidents();
-    const filteredIncidents = filterIncidents(allIncidents);
+    let filteredIncidents = filterIncidents(allIncidents);
 
-    await tweetSummaryOfLast24Hours(client, filteredIncidents.length);
+    if (argv.tweetReps) {
+        await downloadCityCouncilPolygons(representatives[argv.location].geojsonUrl);
+        filteredIncidents = mapIncidentsToCityCouncilDistricts(filteredIncidents);
+    }
+
+    await tweetSummaryOfLast24Hours(client, filteredIncidents);
 
     for (const incident of filteredIncidents) {
         // wait one minute to prevent rate limiting
