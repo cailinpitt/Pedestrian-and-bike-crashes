@@ -62,7 +62,7 @@ To set this up, you'll need to:
 4. Run the bot: `node index.js --location cityNameOne --tweetReps`
 
 #### Create a geojson file of your city council districts
-A geojson file is a file containing geographic shapes. The bot uses this file to map a crash to the city council district is happened in. 
+A geojson file is a file containing geographic shapes. The bot uses this file to map a crash to the city council district it happened in. 
 
 You can create a geojson file of your city council districts by going to [geojson.io](http://geojson.io) and tracing out the districts. You'll also need to add a `NAME` property to each district you draw.
 
@@ -71,10 +71,12 @@ You can create a geojson file of your city council districts by going to [geojso
 ![NAME property](example/geojson_name.png)
 
 #### Host the geofile on the internet
-Once you've created the geofile, you'll need to host it somewhere so the bot can download it. Some places you could host it are Google Drive or in an AWS S3 bucket. You'll need the URL to the file.
+Once you've created the geofile, you'll need to host it somewhere so the bot can download it. Examples of places you could host it are Google Drive or in an AWS S3 bucket. You'll need the URL to the file.
 
 #### Create an object in the `representatives.js` file
 Next, you'll need to add an object to the `representatives.js` file that maps the name of each city council district to its representative's name (or Twitter account if you want to tag them). You'll also need to add the geojson url and representative district term. The representative district term is just what a city council district is called in your city (for example, maybe you live in Chicago which would refer to city council districts as wards).
 
 ##### At Large city councilmembers
 If your city has at large councilmembers, you can include an `atLarge` property with an array containing their names (or Twitter usernames). The bot will tweet their names along with the number of crashes that occurred over the last 24 hours.
+
+![At large councilmembers](example/atLarge.png)

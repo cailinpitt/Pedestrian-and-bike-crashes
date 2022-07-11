@@ -157,7 +157,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
 
         if (argv.tweetReps && representatives[argv.location].atLarge) {
             const atLargeRepInfo = representatives[argv.location].atLarge;
-            tweets.push(`At large city council representatives and president: ${lf.format(atLargeRepInfo.representatives)}`);
+            tweets.push(`At large city council representatives and president: ${lf.format(atLargeRepInfo)}`);
         }
     }
 
