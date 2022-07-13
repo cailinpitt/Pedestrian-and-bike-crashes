@@ -143,7 +143,8 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
     const numIncidents = incidents.length;
     const sentenceStart = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes`;
     const tweets = [
-        `${sentenceStart} found over the last 24 hours.`
+        `${sentenceStart} found over the last 24 hours.`,
+        'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
     ];
 
     if (numIncidents > 0 && argv.tweetReps) {
@@ -160,8 +161,6 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
             tweets.push(`At large city council representatives and president: ${lf.format(atLargeRepInfo)}`);
         }
     }
-
-    tweets.push('Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.')
 
     await client.v2.tweetThread(tweets);
 }
