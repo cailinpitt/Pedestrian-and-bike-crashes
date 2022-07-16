@@ -140,20 +140,19 @@ const tweetIncidentThread = async (client, incident) => {
  * @param {*} incidents the relevant Citizen incidents
  */
 const tweetSummaryOfLast24Hours = async (client, incidents) => {
+    const lf = new Intl.ListFormat('en');
     const numIncidents = incidents.length;
-    const sentenceStart = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes`;
-    const tweets = [
-        `${sentenceStart} found over the last 24 hours.`,
-        'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
-    ];
+    let firstTweet = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash found over the last 24 hours.` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`;
+    const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
+    const tweets = [firstTweet, disclaimerTweet];
 
     if (numIncidents > 0 && argv.tweetReps) {
-        const lf = new Intl.ListFormat('en');
-
         if (argv.tweetReps) {
-            const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))];
-            const districtSentenceStart = numIncidents === 1? `The crash occurred in ${representatives[argv.location].repesentativeDistrictTerm}` : `The crashes occurred in ${representatives[argv.location].repesentativeDistrictTerm}s`;
-            tweets.push(`${districtSentenceStart} ${lf.format(districts)}`);
+            const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))].sort();
+            const districtSentenceStart = numIncidents === 1 ? 'The crash occurred in' : 'The crashes occurred in';
+            const districtSentenceEnd = districts.length === 1 ? `${representatives[argv.location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[argv.location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
+            
+            tweets[0] = `${firstTweet}\n\n${districtSentenceStart} ${districtSentenceEnd}.`;
         }
 
         if (argv.tweetReps && representatives[argv.location].atLarge) {
