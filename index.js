@@ -68,7 +68,7 @@ const downloadMapImages = async (incident, eventKey) => {
         const googleSatelliteImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}_satellite.png`);
         const googleSatelliteWriter = fs.createWriteStream(googleSatelliteImagePath);
         const googleSatelliteResponse = await axios({
-            url: `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=AIzaSyC-VXAyQVn1TOiZGQmn2nqts4mUMO99bU4`,
+            url: `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=${keys[argv.location].googleKey}`,
             method: 'GET',
             responseType: 'stream',
         });
