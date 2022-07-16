@@ -10,7 +10,7 @@ A Twitter bot that tweets Bicyclist and Pedestrian related crashes, using Citize
 To run: `node index.js --location cityNameOne`, where `cityNameOne` is the name of the city you want to fetch and tweet data for (see `keys` section for more information).
 
 ### Keys file
-To use, create a `keys.file` with the following format for each city you want to fetch and tweet data for:
+To use, create a `keys.js` with the following format for each city you want to fetch and tweet data for:
 
 ```js
 module.exports = {
@@ -49,7 +49,26 @@ The `timeZone` value is used for converting incident times (Citizen stores them 
 ---
 
 ### Advanced
+#### Satellite image of crash site
+The bot can tweet zoomed in satellite images of the crash site, in addition to the standard citizen map. To enable this, you'll first need to add a `googleKey` property to your city object in the `keys.js` file containing an API key from a [Google Developer Platform account](https://developers.google.com/maps/documentation/maps-static/get-api-key). Example:
 
+```js
+module.exports = {
+    cityNameOne: {
+        consumer_key: 'consumer_key',
+        consumer_secret: 'consumer_secret',
+        ...
+        googleKey: 'google_api_key',
+    },
+    ...
+};
+```
+
+Then, call the bot with the `--tweetSatellite` flag and each incident thread will contain both a satellite image of the crash site and the standard citizen map: 
+
+```node index.js --location atlanta --tweetSatellite```
+
+#### Representatives
 The bot has the ability to determine the exact city council district a crash occurred in, and tweet the name of the district and representative in addition to the crash information.
 
 ![Tweet screenshot of representative info](example/repinfo.png)
@@ -61,7 +80,7 @@ To set this up, you'll need to:
 3. Create an object in the `representatives.js` file for your city (atlanta is included as an example)
 4. Run the bot: `node index.js --location cityNameOne --tweetReps`
 
-#### Create a geojson file of your city council districts
+##### Create a geojson file of your city council districts
 A geojson file is a file containing geographic shapes. The bot uses this file to map a crash to the city council district it happened in. 
 
 You can create a geojson file of your city council districts by going to [geojson.io](http://geojson.io) and tracing out the districts. You'll also need to add a `NAME` property to each district you draw.
@@ -70,13 +89,13 @@ You can create a geojson file of your city council districts by going to [geojso
 
 ![NAME property](example/geojson_name.png)
 
-#### Host the geofile on the internet
+##### Host the geofile on the internet
 Once you've created the geofile, you'll need to host it somewhere so the bot can download it. Examples of places you could host it are Google Drive or in an AWS S3 bucket. You'll need the URL to the file.
 
-#### Create an object in the `representatives.js` file
+##### Create an object in the `representatives.js` file
 Next, you'll need to add an object to the `representatives.js` file that maps the name of each city council district to its representative's name (or Twitter account if you want to tag them). You'll also need to add the geojson url and representative district term. The representative district term is just what a city council district is called in your city (for example, maybe you live in Chicago which would refer to city council districts as wards).
 
-##### At Large city councilmembers
+###### At Large city councilmembers
 If your city has at large councilmembers, you can include an `atLarge` property with an array containing their names (or Twitter usernames). The bot will tweet their names along with the number of crashes that occurred over the last 24 hours.
 
 ![At large councilmembers](example/atLarge.png)

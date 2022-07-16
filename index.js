@@ -50,22 +50,36 @@ const fetchIncidents = async () => {
 };
 
 /**
- * Makes a GET request to download a map image of an incident.
- * @param {String} url url of the image to download
+ * Makes GET requests to download map images of an incident.
+ * @param {String} incident the incident to download images for
  * @param {String} eventKey the ID of the citizen incident
  * @returns resolved promise.
  */
-const downloadMapImage = async (url, eventKey) => {
-    const imagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}.png`);
-    const writer = fs.createWriteStream(imagePath);
-
-    const response = await axios({
-        url,
+const downloadMapImages = async (incident, eventKey) => {
+    const citizenMapImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}.png`);
+    const citizenMapWriter = fs.createWriteStream(citizenMapImagePath);
+    const citizenMapResponse = await axios({
+        url: incident.shareMap,
         method: 'GET',
-        responseType: 'stream'
+        responseType: 'stream',
     });
+
+    if (argv.tweetSatellite && keys[argv.location].googleKey) {
+        const googleSatelliteImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}_satellite.png`);
+        const googleSatelliteWriter = fs.createWriteStream(googleSatelliteImagePath);
+        const googleSatelliteResponse = await axios({
+            url: `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=${keys[argv.location].googleKey}`,
+            method: 'GET',
+            responseType: 'stream',
+        });
+
+        return Promise.all([
+            new Promise(resolve => citizenMapResponse.data.pipe(citizenMapWriter).on('finish', resolve)),
+            new Promise(resolve => googleSatelliteResponse.data.pipe(googleSatelliteWriter).on('finish', resolve)),
+        ]);
+    }
     
-    return new Promise(resolve => response.data.pipe(writer).on('finish', resolve));
+    return new Promise(resolve => citizenMapResponse.data.pipe(citizenMapWriter).on('finish', resolve));
 };
 
 const mapCoordinateToCityCouncilDistrict = (coordinate, cityCouncilFeatures) => {
@@ -110,13 +124,21 @@ const resetAssetsFolder = () => {
 const tweetIncidentThread = async (client, incident) => {
     const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
     const tweets = [];
+    const media_ids = [];
 
-    // Upload map image and add alt text
-    const mediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
-    await client.v1.createMediaMetadata(mediaId, { alt_text: { text: `A photo of a map at ${incident.address}` } });
+    // Upload map images and add alt text
+    const citizenMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
+    await client.v1.createMediaMetadata(citizenMapMediaId, { alt_text: { text: `A photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
+    media_ids.push(citizenMapMediaId);
+
+    if (argv.tweetSatellite) {
+        const satelliteMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}_satellite.png`);
+        await client.v1.createMediaMetadata(satelliteMapMediaId, { alt_text: { text: `A satellite photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
+        media_ids.push(satelliteMapMediaId);
+    }
 
     // Add initial tweet with map image linked
-    tweets.push({ text: `${incident.raw}\n\n${incidentDate}`, media: { media_ids: [ mediaId ]}})
+    tweets.push({ text: `${incident.raw}\n\n${incidentDate}`, media: { media_ids }})
 
 
     for (const updateKey in incident.updates) {
@@ -140,20 +162,19 @@ const tweetIncidentThread = async (client, incident) => {
  * @param {*} incidents the relevant Citizen incidents
  */
 const tweetSummaryOfLast24Hours = async (client, incidents) => {
+    const lf = new Intl.ListFormat('en');
     const numIncidents = incidents.length;
-    const sentenceStart = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes`;
-    const tweets = [
-        `${sentenceStart} found over the last 24 hours.`,
-        'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.'
-    ];
+    let firstTweet = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash found over the last 24 hours.` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`;
+    const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
+    const tweets = [firstTweet, disclaimerTweet];
 
     if (numIncidents > 0 && argv.tweetReps) {
-        const lf = new Intl.ListFormat('en');
-
         if (argv.tweetReps) {
-            const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))];
-            const districtSentenceStart = numIncidents === 1? `The crash occurred in ${representatives[argv.location].repesentativeDistrictTerm}` : `The crashes occurred in ${representatives[argv.location].repesentativeDistrictTerm}s`;
-            tweets.push(`${districtSentenceStart} ${lf.format(districts)}`);
+            const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))].sort();
+            const districtSentenceStart = numIncidents === 1 ? 'The crash occurred in' : 'The crashes occurred in';
+            const districtSentenceEnd = districts.length === 1 ? `${representatives[argv.location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[argv.location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
+            
+            tweets[0] = `${firstTweet}\n\n${districtSentenceStart} ${districtSentenceEnd}.`;
         }
 
         if (argv.tweetReps && representatives[argv.location].atLarge) {
@@ -230,6 +251,10 @@ const validateInputs = () => {
     assert.notEqual(argv.location, undefined, 'location must be passed in');
     assert.notEqual(keys[argv.location], undefined, 'keys file must have location information');
     
+    if (argv.tweetSatellite) {
+        assert.notEqual(keys[argv.location].googleKey, undefined, 'keys file must contain googleKey for location if calling with tweetSatellite flag');
+    }
+
     if (argv.tweetReps) {
         assert.notEqual(representatives[argv.location], undefined, 'must have representative info for location if calling with tweetReps flag');
         assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
@@ -263,7 +288,7 @@ const main = async () => {
         // wait one minute to prevent rate limiting
         await delay(60000);
 
-        await downloadMapImage(incident.shareMap, incident.key);
+        await downloadMapImages(incident, incident.key);
 
         await tweetIncidentThread(client, incident);
     }
