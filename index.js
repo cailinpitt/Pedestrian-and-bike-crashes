@@ -216,7 +216,25 @@ const filterIncidents = (allIncidents) => {
             x.title.toLowerCase().includes("struck by vehicle") ||
             x.title.toLowerCase().includes("bicycle") ||
             x.title.toLowerCase().includes("scooter")
-        );
+        )
+        .filter(x => {
+            // Specifically handle fire hydrants. 
+            // Sometimes drivers will hit both a hydrant and a pedestrian: https://twitter.com/PedCrashCincy/status/1547222336377704451?s=20&t=7Ul5acOZibIxmw_m9RXxqg
+            // Sometimes they'll only hit a hydrant: https://twitter.com/PedCrashCincy/status/1550121472286285824?s=20&t=7Ul5acOZibIxmw_m9RXxqg
+            // We want to handle hydrants only if non-drivers are also involved, and ignore if not.
+            if (x.raw.toLowerCase().includes("hydrant") || x.title.toLowerCase().includes("hydrant")) {
+                if (
+                    x.raw.toLowerCase().includes("pedestrian") || x.title.toLowerCase().includes("pedestrian") ||
+                    x.raw.toLowerCase().includes("bicyclist") || x.title.toLowerCase().includes("bicyclist") ||
+                    x.raw.toLowerCase().includes("bicycle") || x.title.toLowerCase().includes("bicycle") ||
+                    x.raw.toLowerCase().includes("scooter") || x.title.toLowerCase().includes("scooter")
+                ) {
+                    return true
+                } else {
+                    return false;
+                }
+            }
+        });
 
     // Get incidents from the last 24 hours with pedestrian or bicyuclist in an update
     // It's possible an incident could have a description that doesn't involve a pedestrian
