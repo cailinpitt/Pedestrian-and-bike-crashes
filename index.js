@@ -23,8 +23,11 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
  * @returns JSON list of incidents.
  */
 const fetchIncidents = async () => {
+    const location = keys[argv.location];
+    // https://citizen.com/api/incident/trending?lowerLatitude=37.50733810871698&lowerLongitude=-77.4896682325317&upperLatitude=37.55817579112309&upperLongitude=-77.37033176746951&fullResponse=true&limit=200
+    const citizenUrl = `https://citizen.com/api/incident/trending?lowerLatitude=${location.lowerLatitude}&lowerLongitude=${location.lowerLongitude}&upperLatitude=${location.upperLatitude}&upperLongitude=${location.upperLongitude}&fullResponse=true&limit=200`;
     const response = await axios({
-        url: `https://citizen.com/api/incident/trending?lowerLatitude=${keys[argv.location].lowerLatitude}&lowerLongitude=${keys[argv.location].lowerLongitude}&upperLatitude=${keys[argv.location].upperLatitude}&upperLongitude=${keys[argv.location].upperLongitude}&fullResponse=true&limit=200`,
+        url: citizenUrl,
         method: 'GET',
     });
 
@@ -36,7 +39,7 @@ const fetchIncidents = async () => {
  * @param {String} url url of the geojson file to download
  * @returns resolved promise.
  */
- const downloadCityCouncilPolygons = async (url) => {
+const downloadCityCouncilPolygons = async (url) => {
     const geojsonPath = path.resolve(__dirname, `${assetDirectory}/city_council_districts.geojson`);
     const writer = fs.createWriteStream(geojsonPath);
 
@@ -45,7 +48,7 @@ const fetchIncidents = async () => {
         method: 'GET',
         responseType: 'stream'
     });
-    
+
     return new Promise(resolve => response.data.pipe(writer).on('finish', resolve));
 };
 
@@ -78,7 +81,7 @@ const downloadMapImages = async (incident, eventKey) => {
             new Promise(resolve => googleSatelliteResponse.data.pipe(googleSatelliteWriter).on('finish', resolve)),
         ]);
     }
-    
+
     return new Promise(resolve => citizenMapResponse.data.pipe(citizenMapWriter).on('finish', resolve));
 };
 
@@ -94,19 +97,19 @@ const mapCoordinateToCityCouncilDistrict = (coordinate, cityCouncilFeatures) => 
 
 const mapIncidentsToCityCouncilDistricts = (incidents) => {
     const cityCouncilFeatureCollection = turf.featureCollection(
-            JSON.parse(fs.readFileSync(`${assetDirectory}/city_council_districts.geojson`))
-        ).features.features;
+        JSON.parse(fs.readFileSync(`${assetDirectory}/city_council_districts.geojson`))
+    ).features.features;
 
     return incidents.map(x => {
         return {
             ...x,
             cityCouncilDistrict: mapCoordinateToCityCouncilDistrict(
-                    turf.point([x.longitude, x.latitude]), 
-                    cityCouncilFeatureCollection
-                ),
-        }
+                turf.point([x.longitude, x.latitude]),
+                cityCouncilFeatureCollection
+            ),
+        };
     });
-}
+};
 
 /**
  * Deletes asset folder from disk, and then re-creates it.
@@ -122,7 +125,7 @@ const resetAssetsFolder = () => {
  * @param {*} incident the Citizen incident to tweet
  */
 const tweetIncidentThread = async (client, incident) => {
-    const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
+    const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone });
     const tweets = [];
     const media_ids = [];
 
@@ -138,19 +141,18 @@ const tweetIncidentThread = async (client, incident) => {
     }
 
     // Add initial tweet with map image linked
-    tweets.push({ text: `${incident.raw}\n\n${incidentDate}`, media: { media_ids }})
-
+    tweets.push({ text: `${incident.raw}\n\n${incidentDate}`, media: { media_ids } });
 
     for (const updateKey in incident.updates) {
         if (incident.updates[updateKey].type != 'ROOT') {
-            const updateTime = new Date(incident.updates[updateKey].ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
-            tweets.push(`${incident.updates[updateKey].text}\n\n${updateTime}`)
+            const updateTime = new Date(incident.updates[updateKey].ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone });
+            tweets.push(`${incident.updates[updateKey].text}\n\n${updateTime}`);
         }
     }
 
     if (argv.tweetReps && representatives[argv.location][incident.cityCouncilDistrict] && incident.cityCouncilDistrict) {
         const representative = representatives[argv.location][incident.cityCouncilDistrict];
-        tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
+        tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`);
     }
 
     await client.v2.tweetThread(tweets);
@@ -173,7 +175,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
             const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))].sort();
             const districtSentenceStart = numIncidents === 1 ? 'The crash occurred in' : 'The crashes occurred in';
             const districtSentenceEnd = districts.length === 1 ? `${representatives[argv.location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[argv.location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
-            
+
             tweets[0] = `${firstTweet}\n\n${districtSentenceStart} ${districtSentenceEnd}.`;
         }
 
@@ -184,7 +186,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
     }
 
     await client.v2.tweetThread(tweets);
-}
+};
 
 /**
  * Filters Citizen incidents and returns ones involving Pedestrian and Bicyclists.
@@ -197,13 +199,13 @@ const filterIncidents = (allIncidents) => {
     // Get incidents from the last 24 hours with pedestrian or bicyclist in the top level description
     const relevantIncidents = allIncidents
         .filter(x => x.ts >= yesterdayTimestampInMs)
-        .filter(x => 
+        .filter(x =>
             !x.raw.toLowerCase().includes("robbed") &&
             !x.raw.toLowerCase().includes("burglary") &&
             !x.title.toLowerCase().includes("robbed") &&
             !x.title.toLowerCase().includes("burglary")
         )
-        .filter(x => 
+        .filter(x =>
             x.raw.toLowerCase().includes("pedestrian") ||
             x.raw.toLowerCase().includes("bicyclist") ||
             x.raw.toLowerCase().includes("struck by vehicle") ||
@@ -223,25 +225,24 @@ const filterIncidents = (allIncidents) => {
         .filter(x => x.ts >= yesterdayTimestampInMs)
         .filter(x => {
             for (const updateObjectKey in x.updates) {
-                const updateText = x.updates[updateObjectKey].text.toLowerCase()
+                const updateText = x.updates[updateObjectKey].text.toLowerCase();
                 if (
                     updateText.includes("robbed") ||
                     updateText.includes("burglary") ||
                     updateText.includes("breaking into")
                 ) {
-                    return false
-                }
-                else if (
-                    updateText.includes("pedestrian") || 
-                    updateText.includes("bicyclist") || 
-                    updateText.includes("struck by vehicle") || 
+                    return false;
+                } else if (
+                    updateText.includes("pedestrian") ||
+                    updateText.includes("bicyclist") ||
+                    updateText.includes("struck by vehicle") ||
                     updateText.includes("bicycle") ||
                     updateText.includes("scooter")
                 ) {
-                    return true
+                    return true;
                 }
             }
-            return false
+            return false;
         });
 
     return Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
@@ -250,7 +251,7 @@ const filterIncidents = (allIncidents) => {
 const validateInputs = () => {
     assert.notEqual(argv.location, undefined, 'location must be passed in');
     assert.notEqual(keys[argv.location], undefined, 'keys file must have location information');
-    
+
     if (argv.tweetSatellite) {
         assert.notEqual(keys[argv.location].googleKey, undefined, 'keys file must contain googleKey for location if calling with tweetSatellite flag');
     }
@@ -260,16 +261,17 @@ const validateInputs = () => {
         assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
         assert.notEqual(representatives[argv.location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
     }
-}
+};
 
 const main = async () => {
-    validateInputs()
+    validateInputs();
+    const keysObj = keys[argv.location];
 
     const client = new TwitterApi({
-        appKey: keys[argv.location].consumer_key,
-        appSecret: keys[argv.location].consumer_secret,
-        accessToken: keys[argv.location].access_token,
-        accessSecret: keys[argv.location].access_token_secret,
+        appKey: keysObj.consumer_key,
+        appSecret: keysObj.consumer_secret,
+        accessToken: keysObj.access_token,
+        accessSecret: keysObj.access_token_secret,
     });
 
     resetAssetsFolder();
