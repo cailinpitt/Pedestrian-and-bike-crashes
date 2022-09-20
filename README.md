@@ -50,7 +50,7 @@ The `timeZone` value is used for converting incident times (Citizen stores them 
 
 ### Advanced
 #### Satellite image of crash site
-The bot can tweet zoomed in satellite images of the crash site, in addition to the standard citizen map. To enable this, you'll first need to add a `googleKey` property to your city object in the `keys.js` file containing an API key from a [Google Developer Platform account](https://developers.google.com/maps/documentation/maps-static/get-api-key). Example:
+The bot can tweet zoomed in satellite images of the crash site, in addition to the standard citizen map. The Google map is a zoomed-in satellite image of the location of the crash and the Citizen map shows a simplified larger context. To enable inclusion of maps in your incident tweets, you'll first need to add a `googleKey` property to your city object in the `keys.js` file containing an API key from a [Google Developer Platform account](https://developers.google.com/maps/documentation/maps-static/get-api-key). You will need to enable the Maps Static API for your key. Then place your API key in the keys file:
 
 ```js
 module.exports = {
