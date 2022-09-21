@@ -177,9 +177,12 @@ const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => 
   const numIncidents = incidents.length;
   let firstTweet = numIncidents > 0
     ? `There ${numIncidents === 1 ? 'was' : 'were'} ${numIncidents} incident${numIncidents === 1 ? '' : 's'} of traffic violence found over the last 24 hours. Of these, ${numPedIncidents} involved pedestrians or cyclists.`
-    : `There were no incidents of traffic violence reported to 911 today in the RVA area`;
+    : `There were no incidents of traffic violence reported to 911 today in the RVA area.`;
   const disclaimerTweet = `Disclaimer: This bot tweets incidents called into 911 and is not representative of all traffic violence that occurred.`;
-  const tweets = [firstTweet, disclaimerTweet];
+  const tweets = [firstTweet];
+  if (numIncidents > 0) {
+    tweets.push(disclaimerTweet);
+  }
 
   if (numIncidents > 0 && argv.tweetReps) {
     if (argv.tweetReps) {
