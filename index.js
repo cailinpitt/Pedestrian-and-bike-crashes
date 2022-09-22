@@ -28,7 +28,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fetchIncidents = async () => {
   const location = keys[argv.location];
   const limit = 200; // 200 was not high enough for NYC data
-  // https://citizen.com/api/incident/trending?lowerLatitude=37.50733810871698&lowerLongitude=-77.4896682325317&upperLatitude=37.55817579112309&upperLongitude=-77.37033176746951&fullResponse=true&limit=200
+  // https://citizen.com/api/incident/trending?lowerLatitude=37.425128&lowerLongitude=-77.669312&upperLatitude=37.716030&upperLongitude=-77.284938&fullResponse=true&limit=200
   const citizenUrl = `https://citizen.com/api/incident/trending?lowerLatitude=${location.lowerLatitude}&lowerLongitude=${location.lowerLongitude}&upperLatitude=${location.upperLatitude}&upperLongitude=${location.upperLongitude}&fullResponse=true&limit=${limit}`;
   const response = await axios({
     url: citizenUrl,
@@ -214,55 +214,29 @@ const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => 
  */
 const filterPedBikeIncidents = (allIncidents) => {
   // Get incidents from the last 24 hours with pedestrian or bicyclist in the top level description
-  const relevantIncidents = allIncidents
-    .filter(x =>
-      !x.raw.toLowerCase().includes("robbed") &&
-      !x.raw.toLowerCase().includes("burglar") &&
-      !x.raw.toLowerCase().includes("stolen")
-    )
-    .filter(x =>
-      x.raw.toLowerCase().includes("pedestrian") ||
-      x.raw.toLowerCase().includes("cyclist") ||
-      x.raw.toLowerCase().includes("struck by vehicle") ||
-      x.raw.toLowerCase().includes("hit by vehicle") ||
-      x.raw.toLowerCase().includes("bicycle") ||
-      x.raw.toLowerCase().includes("scooter")
-    );
+  const relevantIncidents = excludeWeaponsAndRobbery(allIncidents).filter(x =>
+    x.raw.toLowerCase().includes("pedestrian") ||
+    x.raw.toLowerCase().includes("cyclist") ||
+    x.raw.toLowerCase().includes("struck by vehicle") ||
+    x.raw.toLowerCase().includes("hit by vehicle") ||
+    x.raw.toLowerCase().includes("bicycle") ||
+    x.raw.toLowerCase().includes("scooter")
+  );
 
-  // Get incidents from the last 24 hours with pedestrian or bicyuclist in an update
-  // It's possible an incident could have a description that doesn't involve a pedestrian
-  // or bicyclist but in a 911 update Citizen later learns they were involved
-  const incidentsWithRelevantUpdates = allIncidents
-    .filter(x => {
-      for (const updateObjectKey in x.updates) {
-        const updateText = x.updates[updateObjectKey].text.toLowerCase();
-        if (
-          updateText.includes("robbed") ||
-          updateText.includes("burglary") ||
-          updateText.includes("breaking into") ||
-          updateText.includes("stolen")
-        ) {
-          return false;
-        } else if (
-          updateText.includes("pedestrian") ||
-          updateText.includes("cyclist") ||
-          updateText.includes("bicyclist") ||
-          updateText.includes("struck by vehicle") ||
-          updateText.includes("hit by vehicle") ||
-          updateText.includes("bicycle") ||
-          updateText.includes("scooter")
-        ) {
-          return true;
-        }
-      }
-      return false;
-    });
-
-  return Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
+  return relevantIncidents;
 };
 
+const excludeWeaponsAndRobbery = (array) => array.filter(x =>
+  !x.raw.toLowerCase().includes("robbed") &&
+  !x.raw.toLowerCase().includes("burglar") &&
+  !x.raw.toLowerCase().includes("stolen") &&
+  !x.raw.toLowerCase().includes("gunmen") &&
+  !x.raw.toLowerCase().includes("armed") &&
+  !x.raw.toLowerCase().includes("gunman")
+);
+
 const filterVehicleOnlyIncidents = (allIncidents) =>
-  allIncidents
+  excludeWeaponsAndRobbery(allIncidents)
     // include vehicle collision but exclude pedestrian, bike, etc
     .filter(x =>
       x.raw.toLowerCase().includes('vehicle collision') ||
@@ -341,10 +315,11 @@ const main = async () => {
   let filteredVehicleOnlyIncidents = filterVehicleOnlyIncidents(remainingIncidents);
 
   // check to see if there were incidents today
-  // console.log([...filteredPedBikeIncidents, ...filteredVehicleOnlyIncidents].map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
+  // console.log('allIncidents', allIncidents.length);
+  // console.log([...filteredVehicleOnlyIncidents, ...filteredPedBikeIncidents].map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
-  // tweet it out!
-  handleIncidentTweets(client, [...filteredPedBikeIncidents, ...filteredVehicleOnlyIncidents], filteredPedBikeIncidents.length);
+  // next line is where the magic happens
+  handleIncidentTweets(client, [...filteredVehicleOnlyIncidents, ...filteredPedBikeIncidents], filteredPedBikeIncidents.length);
 };
 
 main();
