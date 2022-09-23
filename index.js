@@ -8,7 +8,7 @@ const argv = require('minimist')(process.argv.slice(2));
 const turf = require('@turf/turf');
 const assert = require('node:assert/strict');
 
-const testData = require('./richmond.json');
+const testData = require('./archive/tweetIncidentSummaries-richmond.json');
 
 const assetDirectory = `./assets-${argv.location}`;
 
@@ -295,7 +295,14 @@ const saveIncidentSummaries = (array) => {
   fs.writeFile(
     tweetIncidentSummaryFile,
     JSON.stringify(
-      array.map(obj => ({ key: obj.key, raw: obj.raw, ts: obj.ts, ll: obj.ll, shareMap: obj.shareMap }))
+      array.map(obj => ({
+        key: obj.key,
+        raw: obj.raw,
+        ts: obj.ts,
+        date: new Date(obj.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone }),
+        ll: obj.ll,
+        shareMap: obj.shareMap
+      }))
     )
   );
 };
@@ -349,7 +356,8 @@ const main = async () => {
   // console.log(incidentList.map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
   // next line is where the magic happens
-  handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
+  // handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
 };
 
 main();
+// eliminateDuplicateIncidentsAndUpdateFile([]);
