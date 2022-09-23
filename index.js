@@ -12,6 +12,8 @@ const testData = require('./richmond.json');
 
 const assetDirectory = `./assets-${argv.location}`;
 
+const daysToTweet = argv.days ? Number(argv.days) : 1;
+
 
 /**
  * Temporarily halts program execution.
@@ -27,7 +29,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
  */
 const fetchIncidents = async () => {
   const location = keys[argv.location];
-  const limit = 200; // 200 was not high enough for NYC data
+  const limit = 200 * daysToTweet; // 200 was not high enough for NYC data
   // https://citizen.com/api/incident/trending?lowerLatitude=37.425128&lowerLongitude=-77.669312&upperLatitude=37.716030&upperLongitude=-77.284938&fullResponse=true&limit=200
   const citizenUrl = `https://citizen.com/api/incident/trending?lowerLatitude=${location.lowerLatitude}&lowerLongitude=${location.lowerLongitude}&upperLatitude=${location.upperLatitude}&upperLongitude=${location.upperLongitude}&fullResponse=true&limit=${limit}`;
   const response = await axios({
@@ -176,7 +178,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => 
   const lf = new Intl.ListFormat('en');
   const numIncidents = incidents.length;
   let firstTweet = numIncidents > 0
-    ? `There ${numIncidents === 1 ? 'was' : 'were'} ${numIncidents} incident${numIncidents === 1 ? '' : 's'} of traffic violence found over the last 24 hours. Of these, ${numPedIncidents} involved pedestrians or cyclists.`
+    ? `There ${numIncidents === 1 ? 'was' : 'were'} ${numIncidents} incident${numIncidents === 1 ? '' : 's'} of traffic violence found over the last ${daysToTweet === 1 ? '24 hours' : `${daysToTweet} days`}. Of these, ${numPedIncidents} involved pedestrians or cyclists.`
     : `There were no incidents of traffic violence reported to 911 today in the RVA area.`;
   const disclaimerTweet = `Disclaimer: This bot tweets incidents called into 911 and is not representative of all traffic violence that occurred.`;
   const tweets = [firstTweet];
@@ -269,15 +271,13 @@ const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) 
     filteredIncidents = mapIncidentsToCityCouncilDistricts(filteredIncidents);
   }
 
-  await tweetSummaryOfLast24Hours(client, filteredIncidents, numPedIncidents);
-
   for (const incident of filteredIncidents) {
     console.log(incident.raw);
     // wait one minute to prevent rate limiting
     // rate limited from twitter? surely a few seconds would be enough? 
-    // success on 30s, 20s, failed on 10s but seemed like it was bc of google api
+    // success on 30s, 20s, 5s failed on 10s but seemed like it was bc of google api
 
-    await delay(20000);
+    await delay(5000);
     try {
       await downloadMapImages(incident, incident.key);
     } catch (err) {
@@ -285,6 +285,32 @@ const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) 
     }
     await tweetIncidentThread(client, incident);
   }
+
+  // tweet the summary last because then it'll always be at the top of the timeline
+  await tweetSummaryOfLast24Hours(client, filteredIncidents, numPedIncidents);
+};
+const tweetIncidentSummaryFile = `./archive/tweetIncidentSummaries-${argv.location}.json`;
+
+const saveIncidentSummaries = (array) => {
+  fs.writeFile(
+    tweetIncidentSummaryFile,
+    JSON.stringify(
+      array.map(obj => ({ key: obj.key, raw: obj.raw, ts: obj.ts, ll: obj.ll, shareMap: obj.shareMap }))
+    )
+  );
+};
+
+const eliminateDuplicateIncidentsAndUpdateFile = (array) => {
+  let summaryArr = [];
+  try {
+    summaryArr = JSON.parse(fs.readFileSync(tweetIncidentSummaryFile));
+  } catch (err) {
+    console.log(err.message);
+  }
+  const incidentKeys = summaryArr.map(summary => summary.key);
+  const trimmedArray = array.filter(obj => obj && incidentKeys.indexOf(obj.key) === -1);
+  saveIncidentSummaries([...summaryArr, ...trimmedArray].filter(obj => Boolean(obj.key)));
+  return trimmedArray;
 };
 
 const main = async () => {
@@ -301,25 +327,29 @@ const main = async () => {
   resetAssetsFolder();
 
   // uncomment next section when using test data
-  // const allIncidents = testData.results;
-  // console.log('all pedbike', filterPedBikeIncidents(allIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
-  // console.log('all vehicle', filterVehicleOnlyIncidents(allIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
+  // const currentIncidents = testData.results;
+  // console.log('all pedbike', filterPedBikeIncidents(currentIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
+  // console.log('all vehicle', filterVehicleOnlyIncidents(currentIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
   const allIncidents = await fetchIncidents();
-  const yesterdayTimestampInMs = Date.now() - 86400000;
-  const todaysIncidents = allIncidents.filter(x => x.ts >= yesterdayTimestampInMs);
+  const targetTimeInMs = Date.now() - (86400000 * daysToTweet);
+  const currentIncidents = allIncidents.filter(x => x.ts >= targetTimeInMs);
 
-  let filteredPedBikeIncidents = filterPedBikeIncidents(todaysIncidents);
+  const filteredPedBikeIncidents = filterPedBikeIncidents(currentIncidents);
   const incidentTitles = filteredPedBikeIncidents.map(x => x.title);
-  const remainingIncidents = todaysIncidents.filter(x => incidentTitles.indexOf(x.title) === -1);
-  let filteredVehicleOnlyIncidents = filterVehicleOnlyIncidents(remainingIncidents);
+  const remainingIncidents = currentIncidents.filter(x => incidentTitles.indexOf(x.title) === -1);
+  const filteredVehicleOnlyIncidents = filterVehicleOnlyIncidents(remainingIncidents);
+  let incidentList = [...filteredVehicleOnlyIncidents, filteredPedBikeIncidents];
+  // check for duplicates
+  incidentList = eliminateDuplicateIncidentsAndUpdateFile(incidentList);
 
-  // check to see if there were incidents today
+  // check to see if there were incidents today;
   // console.log('allIncidents', allIncidents.length);
-  // console.log([...filteredVehicleOnlyIncidents, ...filteredPedBikeIncidents].map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
+  // console.log('incidentList', incidentList.length);
+  // console.log(incidentList.map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
   // next line is where the magic happens
-  handleIncidentTweets(client, [...filteredVehicleOnlyIncidents, ...filteredPedBikeIncidents], filteredPedBikeIncidents.length);
+  handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
 };
 
 main();

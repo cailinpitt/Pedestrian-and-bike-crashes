@@ -1,0 +1,92 @@
+[
+  {
+    "key": "-NCbnyfGMyz16QPMeQJc",
+    "raw": "Vehicle Collision With Injuries at 3806 Forest Hill Ave, Richmond, VA 23225, USA",
+    "ts": 1663894562000,
+    "ll": [
+      37.51620004303577,
+      -77.47352989272845
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCbnyfGMyz16QPMeQJc.png"
+  },
+  {
+    "key": "-NCbLRrPpZBYDyFK61dO",
+    "raw": "Vehicle Collision at 3016 Jefferson Davis Hwy, Richmond, VA 23234, USA",
+    "ts": 1663886282000,
+    "ll": [
+      37.48175503103144,
+      -77.44449489630968
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCbLRrPpZBYDyFK61dO.png"
+  },
+  {
+    "key": "-NCb9Y-FRkHmDqb7KpEQ",
+    "raw": "Vehicle Collision at 1107 St John St, Richmond, VA 23220, USA",
+    "ts": 1663883161000,
+    "ll": [
+      37.55339585947595,
+      -77.43605413013046
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCb9Y-FRkHmDqb7KpEQ.png"
+  },
+  {
+    "key": "-NCb9Y2BIoj4Coak63WD",
+    "raw": "Vehicle Collision With Injuries at 2405 US-60, Richmond, VA 23225, USA",
+    "ts": 1663883161000,
+    "ll": [
+      37.520309424153055,
+      -77.45824920293069
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCb9Y2BIoj4Coak63WD.png"
+  },
+  {
+    "key": "-NCb-EzDdMEySw-JUTuE",
+    "raw": "Vehicle Collision With Injuries at 1223 E Marshall St, Richmond, VA 23298, USA",
+    "ts": 1663880462000,
+    "ll": [
+      37.5390893732015,
+      -77.42917282929443
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCb-EzDdMEySw-JUTuE.png"
+  },
+  {
+    "key": "-NC_g0TejVC4A6d0arT_",
+    "raw": "Vehicle Collision With Injuries at 26 W Brookland Park Blvd, Richmond, VA 23222, USA",
+    "ts": 1663861502000,
+    "ll": [
+      37.57157005722242,
+      -77.43387988649023
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_g0TejVC4A6d0arT_.png"
+  },
+  {
+    "key": "-NC_g0XASf9auZRXlv77",
+    "raw": "Vehicle Collision With Injuries at Jefferson Davis & Maury, Richmond, VA 23224, USA",
+    "ts": 1663858383000,
+    "ll": [
+      37.5130400236291,
+      -77.44792988405001
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_g0XASf9auZRXlv77.png"
+  },
+  {
+    "key": "-NC_g0MaodaXA11LjBdP",
+    "raw": "Vehicle Collision at 2714 North Ave, Richmond, VA 23222, USA",
+    "ts": 1663861502000,
+    "ll": [
+      37.56777899678665,
+      -77.43307039611963
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_g0MaodaXA11LjBdP.png"
+  },
+  {
+    "key": "-NC_g0IK_qaGLVam4XXo",
+    "raw": "Vehicle Collision With Injuries at Hull + 21st, Richmond, VA 23224, USA",
+    "ts": 1663858382000,
+    "ll": [
+      37.51643004245889,
+      -77.45119991593585
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_g0IK_qaGLVam4XXo.png"
+  }
+]

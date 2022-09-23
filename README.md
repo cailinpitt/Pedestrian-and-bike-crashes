@@ -9,6 +9,9 @@ A Twitter bot that tweets Bicyclist and Pedestrian related crashes, using Citize
 
 To run: `node index.js --location cityNameOne`, where `cityNameOne` is the name of the city you want to fetch and tweet data for (see `keys` section for more information).
 
+#### Options 
+By default, this code will only tweet out events that happened within one day. You can optionally tweet data for more than 1 day by including option `--days` in your node command. File `tweetIncidentSummaries.json` will store summaries of all crashes that you grab from citizen.
+
 ### Keys file
 To use, create a `keys.js` with the following format for each city you want to fetch and tweet data for:
 

@@ -1,0 +1,52 @@
+[
+  {
+    "key": "-NCbkl8LHtdBFWDsqe3l",
+    "raw": "Two-Vehicle Collision at S Broad St & I-95 S, Philadelphia, Pennsylvania, 19148",
+    "ts": 1663893181000,
+    "ll": [
+      39.89918006113692,
+      -75.17481993659159
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCbkl8LHtdBFWDsqe3l.png"
+  },
+  {
+    "key": "-NCbOTKEvx6CgVtdAW60",
+    "raw": "Vehicle Collision at N 10th St & Brown St, Philadelphia, Pennsylvania, 19123",
+    "ts": 1663887074000,
+    "ll": [
+      39.96625003869005,
+      -75.15351992806119
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCbOTKEvx6CgVtdAW60.png"
+  },
+  {
+    "key": "-NCa1-Ozx2knF6pH9OPz",
+    "raw": "Vehicle Collision  at S 30th St & Chestnut St, Philadelphia, Pennsylvania, 19104",
+    "ts": 1663864145000,
+    "ll": [
+      39.95330004019351,
+      -75.18373995795089
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NCa1-Ozx2knF6pH9OPz.png"
+  },
+  {
+    "key": "-NC_zZJzHWDdPeCQXHNP",
+    "raw": "Vehicle Collision at N American St & W Huntingdon St, Philadelphia, Pennsylvania, 19133",
+    "ts": 1663866430000,
+    "ll": [
+      39.98999006114434,
+      -75.13656987582173
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_zZJzHWDdPeCQXHNP.png"
+  },
+  {
+    "key": "-NC_HvHz41yQ0u6I127a",
+    "raw": "Man Assaulting Person Following Vehicle Collision at Washington Ave & S Christopher Columbus Blvd, Philadelphia, Pennsylvania, 19147",
+    "ts": 1663852390000,
+    "ll": [
+      39.93335002098854,
+      -75.14358988736923
+    ],
+    "shareMap": "https://storage.googleapis.com/citizen-notif-attachment/-NC_HvHz41yQ0u6I127a.png"
+  }
+]
