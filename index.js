@@ -274,7 +274,7 @@ const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) 
   for (const incident of filteredIncidents) {
     console.log(incident.raw);
     // wait one minute to prevent rate limiting
-    // rate limited from twitter? surely a few seconds would be enough? 
+    // rate limited from twitter? surely a few seconds would be enough?
     // success on 30s, 20s, 5s failed on 10s but seemed like it was bc of google api
 
     await delay(2000);
@@ -360,7 +360,7 @@ const main = async () => {
   handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
 
   // tweet the summary last because then it'll always be at the top of the timeline
-  tweetSummaryOfLast24Hours(client, incidentList, filteredPedBikeIncidents);
+  tweetSummaryOfLast24Hours(client, incidentList, filteredPedBikeIncidents.length);
 };
 
 main();
