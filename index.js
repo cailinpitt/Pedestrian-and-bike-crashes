@@ -277,7 +277,7 @@ const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) 
     // rate limited from twitter? surely a few seconds would be enough? 
     // success on 30s, 20s, 5s failed on 10s but seemed like it was bc of google api
 
-    await delay(5000);
+    await delay(2000);
     try {
       await downloadMapImages(incident, incident.key);
     } catch (err) {
@@ -285,10 +285,8 @@ const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) 
     }
     await tweetIncidentThread(client, incident);
   }
-
-  // tweet the summary last because then it'll always be at the top of the timeline
-  await tweetSummaryOfLast24Hours(client, filteredIncidents, numPedIncidents);
 };
+
 const tweetIncidentSummaryFile = `./archive/tweetIncidentSummaries-${argv.location}.json`;
 
 const saveIncidentSummaries = (array) => {
@@ -315,9 +313,10 @@ const eliminateDuplicateIncidentsAndUpdateFile = (array) => {
     console.log(err.message);
   }
   const incidentKeys = summaryArr.map(summary => summary.key);
-  const trimmedArray = array.filter(obj => obj && incidentKeys.indexOf(obj.key) === -1);
-  saveIncidentSummaries([...summaryArr, ...trimmedArray].filter(obj => Boolean(obj.key)));
-  return trimmedArray;
+  const trimmedArray = array.filter(obj => incidentKeys.indexOf(obj.key) === -1);
+  // this is dumb but undefined is getting in there and i'm not going to figure out why now.
+  saveIncidentSummaries([...summaryArr, ...trimmedArray].filter(obj => Boolean(obj.raw)));
+  return trimmedArray.filter(obj => Boolean(obj.raw));
 };
 
 const main = async () => {
@@ -350,13 +349,18 @@ const main = async () => {
   // check for duplicates
   incidentList = eliminateDuplicateIncidentsAndUpdateFile(incidentList);
 
+  console.log(incidentList.map(i => i.raw));
+
   // check to see if there were incidents today;
   // console.log('allIncidents', allIncidents.length);
   // console.log('incidentList', incidentList.length);
   // console.log(incidentList.map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
   // next line is where the magic happens
-  // handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
+  handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
+
+  // tweet the summary last because then it'll always be at the top of the timeline
+  tweetSummaryOfLast24Hours(client, incidentList, filteredPedBikeIncidents);
 };
 
 main();
