@@ -264,7 +264,7 @@ const validateInputs = () => {
   }
 };
 
-const handleIncidentTweets = async (client, filteredIncidents, numPedIncidents) => {
+const handleIncidentTweets = async (client, filteredIncidents) => {
 
   if (argv.tweetReps) {
     await downloadCityCouncilPolygons(representatives[argv.location].geojsonUrl);
@@ -357,7 +357,7 @@ const main = async () => {
   // console.log(incidentList.map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
 
   // next line is where the magic happens
-  handleIncidentTweets(client, incidentList, filteredPedBikeIncidents.length);
+  handleIncidentTweets(client, incidentList);
 
   // tweet the summary last because then it'll always be at the top of the timeline
   tweetSummaryOfLast24Hours(client, incidentList, filteredPedBikeIncidents.length);
