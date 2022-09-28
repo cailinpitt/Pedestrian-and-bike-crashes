@@ -7,7 +7,7 @@ A Twitter bot that tweets Bicyclist and Pedestrian related crashes, using Citize
 ### Run
 `npm install` to fetch and install dependencies.
 
-To run: `node index.js --location cityNameOne`, where `cityNameOne` is the name of the city you want to fetch and tweet data for (see `keys` section for more information).
+To run: `node index.ts --location cityNameOne`, where `cityNameOne` is the name of the city you want to fetch and tweet data for (see `keys` section for more information).
 
 #### Options 
 By default, this code will only tweet out events that happened within one day. You can optionally tweet data for more than 1 day by including option `--days` in your node command. File `tweetIncidentSummaries.json` will store summaries of all crashes that you grab from citizen.
@@ -69,7 +69,7 @@ module.exports = {
 
 Then, call the bot with the `--tweetSatellite` flag and each incident thread will contain both a satellite image of the crash site and the standard citizen map: 
 
-```node index.js --location atlanta --tweetSatellite```
+```node index.ts --location atlanta --tweetSatellite```
 
 #### Representatives
 The bot has the ability to determine the exact city council district a crash occurred in, and tweet the name of the district and representative in addition to the crash information.
@@ -81,7 +81,7 @@ To set this up, you'll need to:
 1. Create a geojson file of your city council districts
 2. Host the geofile on the internet
 3. Create an object in the `representatives.js` file for your city (atlanta is included as an example)
-4. Run the bot: `node index.js --location cityNameOne --tweetReps`
+4. Run the bot: `node index.ts --location cityNameOne --tweetReps`
 
 ##### Create a geojson file of your city council districts
 A geojson file is a file containing geographic shapes. The bot uses this file to map a crash to the city council district it happened in. 

@@ -1,12 +1,17 @@
-const keys = require('./keys.js');
-const representatives = require('./representatives.js');
+import { IncidentFull } from './types'
+import { Coord } from '@turf/turf'
+import { TwitterApi } from 'twitter-api-v2'
+
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs-extra');
-const { TwitterApi } = require('twitter-api-v2');
 const argv = require('minimist')(process.argv.slice(2));
 const turf = require('@turf/turf');
-const assert = require('node:assert/strict');
+
+const keys = require('./keys.js');
+const representatives = require('./representatives.js');
+const { validateInputs, filterVehicleOnlyIncidents, filterPedBikeIncidents } = require('./utils/filters');
+const { eliminateDuplicateIncidentsAndUpdateFile } = require('./utils/archive')
 
 const testData = require('./archive/tweetIncidentSummaries-richmond.json');
 
@@ -20,7 +25,7 @@ const daysToTweet = argv.days ? Number(argv.days) : 1;
  * @param {Number} ms number of miliseconds to wait
  * @returns promise
  */
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Makes a GET request to Citizen to fetch 200 recent incidents. Using 200 because I think that
@@ -45,7 +50,7 @@ const fetchIncidents = async () => {
  * @param {String} url url of the geojson file to download
  * @returns resolved promise.
  */
-const downloadCityCouncilPolygons = async (url) => {
+const downloadCityCouncilPolygons = async (url: string) => {
   const geojsonPath = path.resolve(__dirname, `${assetDirectory}/city_council_districts.geojson`);
   const writer = fs.createWriteStream(geojsonPath);
 
@@ -64,7 +69,7 @@ const downloadCityCouncilPolygons = async (url) => {
  * @param {String} eventKey the ID of the citizen incident
  * @returns resolved promise.
  */
-const downloadMapImages = async (incident, eventKey) => {
+const downloadMapImages = async (incident: IncidentFull, eventKey: string) => {
   const citizenMapImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}.png`);
   const citizenMapWriter = fs.createWriteStream(citizenMapImagePath);
   const citizenMapResponse = await axios({
@@ -77,6 +82,7 @@ const downloadMapImages = async (incident, eventKey) => {
     const googleSatelliteImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}_satellite.png`);
     const googleSatelliteWriter = fs.createWriteStream(googleSatelliteImagePath);
     const googleSatUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=${keys[argv.location].googleKey}`;
+
     const googleSatelliteResponse = await axios({
       url: googleSatUrl,
       method: 'GET',
@@ -92,7 +98,7 @@ const downloadMapImages = async (incident, eventKey) => {
   return new Promise(resolve => citizenMapResponse.data.pipe(citizenMapWriter).on('finish', resolve));
 };
 
-const mapCoordinateToCityCouncilDistrict = (coordinate, cityCouncilFeatures) => {
+const mapCoordinateToCityCouncilDistrict = (coordinate: Coord, cityCouncilFeatures: any) => {
   for (let i = 0; i < cityCouncilFeatures.length; i++) {
     if (turf.booleanPointInPolygon(coordinate, cityCouncilFeatures[i])) {
       return cityCouncilFeatures[i].properties.NAME;
@@ -102,7 +108,7 @@ const mapCoordinateToCityCouncilDistrict = (coordinate, cityCouncilFeatures) => 
   return null;
 };
 
-const mapIncidentsToCityCouncilDistricts = (incidents) => {
+const mapIncidentsToCityCouncilDistricts = (incidents: IncidentFull[]) => {
   const cityCouncilFeatureCollection = turf.featureCollection(
     JSON.parse(fs.readFileSync(`${assetDirectory}/city_council_districts.geojson`))
   ).features.features;
@@ -131,7 +137,7 @@ const resetAssetsFolder = () => {
  * @param {*} client the instantiated Twitter client
  * @param {*} incident the Citizen incident to tweet
  */
-const tweetIncidentThread = async (client, incident) => {
+const tweetIncidentThread = async (client: TwitterApi, incident: IncidentFull) => {
   const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone });
   const tweets = [];
   const media_ids = [];
@@ -157,8 +163,11 @@ const tweetIncidentThread = async (client, incident) => {
     }
   }
 
+  // @ts-expect-error -- no cityCouncilDistrict
   if (argv.tweetReps && representatives[argv.location][incident.cityCouncilDistrict] && incident.cityCouncilDistrict) {
+    // @ts-expect-error -- no cityCouncilDistrict
     const representative = representatives[argv.location][incident.cityCouncilDistrict];
+    // @ts-expect-error -- no cityCouncilDistrict
     tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`);
   }
 
@@ -174,7 +183,7 @@ const tweetIncidentThread = async (client, incident) => {
  * @param {*} client the instantiated Twitter client
  * @param {*} incidents the relevant Citizen incidents
  */
-const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => {
+const tweetSummaryOfLast24Hours = async (client: TwitterApi, incidents: IncidentFull[], numPedIncidents: number) => {
   const lf = new Intl.ListFormat('en');
   const numIncidents = incidents.length;
   let firstTweet = numIncidents > 0
@@ -188,6 +197,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => 
 
   if (numIncidents > 0 && argv.tweetReps) {
     if (argv.tweetReps) {
+      // @ts-expect-error
       const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))].sort();
       const districtSentenceStart = numIncidents === 1 ? 'The crash occurred in' : 'The crashes occurred in';
       const districtSentenceEnd = districts.length === 1 ? `${representatives[argv.location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[argv.location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
@@ -209,62 +219,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents, numPedIncidents) => 
 
 };
 
-/**
- * Filters Citizen incidents and returns ones involving Pedestrian and Bicyclists.
- * @param {Array} allIncidents an array of Citizen incidents
- * @returns an array of Citizen incidents mentioning Pedestrians or Bicyclists.
- */
-const filterPedBikeIncidents = (allIncidents) => {
-  // Get incidents from the last 24 hours with pedestrian or bicyclist in the top level description
-  const relevantIncidents = excludeWeaponsAndRobbery(allIncidents).filter(x =>
-    x.raw.toLowerCase().includes("pedestrian") ||
-    x.raw.toLowerCase().includes("cyclist") ||
-    x.raw.toLowerCase().includes("struck by vehicle") ||
-    x.raw.toLowerCase().includes("hit by vehicle") ||
-    x.raw.toLowerCase().includes("bicycle") ||
-    x.raw.toLowerCase().includes("scooter")
-  );
-
-  return relevantIncidents;
-};
-
-const excludeWeaponsAndRobbery = (array) => array.filter(x =>
-  !x.raw.toLowerCase().includes("robbed") &&
-  !x.raw.toLowerCase().includes("burglar") &&
-  !x.raw.toLowerCase().includes("stolen") &&
-  !x.raw.toLowerCase().includes("gunmen") &&
-  !x.raw.toLowerCase().includes("armed") &&
-  !x.raw.toLowerCase().includes("gunman")
-);
-
-const filterVehicleOnlyIncidents = (allIncidents) =>
-  excludeWeaponsAndRobbery(allIncidents)
-    // include vehicle collision but exclude pedestrian, bike, etc
-    .filter(x =>
-      x.raw.toLowerCase().includes('vehicle collision') ||
-      x.raw.toLowerCase().includes('vehicle flipped') ||
-      x.raw.toLowerCase().includes('overturned vehicle') ||
-      x.raw.toLowerCase().includes('dragging vehicle') ||
-      x.raw.toLowerCase().includes('hit-and-run')
-
-    );
-
-const validateInputs = () => {
-  assert.notEqual(argv.location, undefined, 'location must be passed in');
-  assert.notEqual(keys[argv.location], undefined, 'keys file must have location information');
-
-  if (argv.tweetSatellite) {
-    assert.notEqual(keys[argv.location].googleKey, undefined, 'keys file must contain googleKey for location if calling with tweetSatellite flag');
-  }
-
-  if (argv.tweetReps) {
-    assert.notEqual(representatives[argv.location], undefined, 'must have representative info for location if calling with tweetReps flag');
-    assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
-    assert.notEqual(representatives[argv.location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
-  }
-};
-
-const handleIncidentTweets = async (client, filteredIncidents) => {
+const handleIncidentTweets = async (client: TwitterApi, filteredIncidents: IncidentFull[]) => {
 
   if (argv.tweetReps) {
     await downloadCityCouncilPolygons(representatives[argv.location].geojsonUrl);
@@ -273,10 +228,6 @@ const handleIncidentTweets = async (client, filteredIncidents) => {
 
   for (const incident of filteredIncidents) {
     console.log(incident.raw);
-    // wait one minute to prevent rate limiting
-    // rate limited from twitter? surely a few seconds would be enough?
-    // success on 30s, 20s, 5s failed on 10s but seemed like it was bc of google api
-
     await delay(2000);
     try {
       await downloadMapImages(incident, incident.key);
@@ -285,38 +236,6 @@ const handleIncidentTweets = async (client, filteredIncidents) => {
     }
     await tweetIncidentThread(client, incident);
   }
-};
-
-const tweetIncidentSummaryFile = `./archive/tweetIncidentSummaries-${argv.location}.json`;
-
-const saveIncidentSummaries = (array) => {
-  fs.writeFile(
-    tweetIncidentSummaryFile,
-    JSON.stringify(
-      array.map(obj => ({
-        key: obj.key,
-        raw: obj.raw,
-        ts: obj.ts,
-        date: new Date(obj.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone }),
-        ll: obj.ll,
-        shareMap: obj.shareMap
-      }))
-    )
-  );
-};
-
-const eliminateDuplicateIncidentsAndUpdateFile = (array) => {
-  let summaryArr = [];
-  try {
-    summaryArr = JSON.parse(fs.readFileSync(tweetIncidentSummaryFile));
-  } catch (err) {
-    console.log(err.message);
-  }
-  const incidentKeys = summaryArr.map(summary => summary.key);
-  const trimmedArray = array.filter(obj => incidentKeys.indexOf(obj.key) === -1);
-  // this is dumb but undefined is getting in there and i'm not going to figure out why now.
-  saveIncidentSummaries([...summaryArr, ...trimmedArray].filter(obj => Boolean(obj.raw)));
-  return trimmedArray.filter(obj => Boolean(obj.raw));
 };
 
 const main = async () => {
@@ -332,36 +251,26 @@ const main = async () => {
 
   resetAssetsFolder();
 
-  // uncomment next section when using test data
-  // const currentIncidents = testData.results;
-  // console.log('all pedbike', filterPedBikeIncidents(currentIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
-  // console.log('all vehicle', filterVehicleOnlyIncidents(currentIncidents).map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
-
   const allIncidents = await fetchIncidents();
   const targetTimeInMs = Date.now() - (86400000 * daysToTweet);
-  const currentIncidents = allIncidents.filter(x => x.ts >= targetTimeInMs);
+  const currentIncidents = allIncidents.filter((x: IncidentFull) => x.ts >= targetTimeInMs);
 
-  const filteredPedBikeIncidents = filterPedBikeIncidents(currentIncidents);
-  const incidentTitles = filteredPedBikeIncidents.map(x => x.title);
-  const remainingIncidents = currentIncidents.filter(x => incidentTitles.indexOf(x.title) === -1);
-  const filteredVehicleOnlyIncidents = filterVehicleOnlyIncidents(remainingIncidents);
-  let incidentList = [...filteredVehicleOnlyIncidents, filteredPedBikeIncidents];
+  const pedBikeIncidents = filterPedBikeIncidents(currentIncidents);
+  const incidentTitles = pedBikeIncidents.map((x: IncidentFull) => x.title);
+  const remainingIncidents = currentIncidents.filter((x: IncidentFull) => incidentTitles.indexOf(x.title) === -1);
+  const vehicleOnlyIncidents = filterVehicleOnlyIncidents(remainingIncidents);
+  let incidentList = [...vehicleOnlyIncidents, pedBikeIncidents];
   // check for duplicates
   incidentList = eliminateDuplicateIncidentsAndUpdateFile(incidentList);
 
-  console.log(incidentList.map(i => i.raw));
-
-  // check to see if there were incidents today;
-  // console.log('allIncidents', allIncidents.length);
-  // console.log('incidentList', incidentList.length);
-  // console.log(incidentList.map(i => ({ raw: i.raw, time: new Date(i.ts).toLocaleString() })));
-
-  // next line is where the magic happens
-  handleIncidentTweets(client, incidentList);
+  await handleIncidentTweets(client, incidentList);
 
   // tweet the summary last because then it'll always be at the top of the timeline
-  tweetSummaryOfLast24Hours(client, incidentList, filteredPedBikeIncidents.length);
+  delay(5000)
+  tweetSummaryOfLast24Hours(client, incidentList, pedBikeIncidents.length);
 };
 
 main();
+
 // eliminateDuplicateIncidentsAndUpdateFile([]);
+// save timestamps for when i ran it? and list of ids for incidents? then i could do the tweet summary after if it didn't go out.

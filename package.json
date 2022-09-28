@@ -2,7 +2,7 @@
   "name": "pedestrian-and-bike-crashes",
   "version": "1.0.0",
   "description": "Twitter both that tweets incidents involving pedestrians and bicyclists",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -24,5 +24,8 @@
     "path": "^0.12.7",
     "twitter": "^1.7.1",
     "twitter-api-v2": "^1.12.2"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.23"
   }
 }
