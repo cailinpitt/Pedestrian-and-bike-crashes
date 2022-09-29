@@ -26,6 +26,8 @@
     "twitter-api-v2": "^1.12.2"
   },
   "devDependencies": {
-    "@types/node": "^18.7.23"
+    "@types/node": "^18.7.23",
+    "@types/turf": "^3.5.32",
+    "prettier": "^2.7.1"
   }
 }
