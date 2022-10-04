@@ -205,14 +205,20 @@ const filterIncidents = (allIncidents) => {
         )
         .filter(x => 
             x.raw.toLowerCase().includes("pedestrian") ||
+            x.raw.toLowerCase().includes("on foot") ||
             x.raw.toLowerCase().includes("bicyclist") ||
+            x.raw.toLowerCase().includes("cyclist") ||
             x.raw.toLowerCase().includes("struck by vehicle") ||
             x.raw.toLowerCase().includes("bicycle") ||
+            x.raw.toLowerCase().includes("cycle") ||
             x.raw.toLowerCase().includes("scooter") ||
             x.title.toLowerCase().includes("pedestrian") ||
+            x.title.toLowerCase().includes("on foot") ||
             x.title.toLowerCase().includes("bicyclist") ||
+            x.title.toLowerCase().includes("cyclist") ||
             x.title.toLowerCase().includes("struck by vehicle") ||
             x.title.toLowerCase().includes("bicycle") ||
+            x.title.toLowerCase().includes("cycle") ||
             x.title.toLowerCase().includes("scooter")
         )
         .filter(x => {
