@@ -126,12 +126,14 @@ const tweetIncidentThread = async (client, incident) => {
     const tweets = [];
     const media_ids = [];
 
-    // Upload map images and add alt text
-    const citizenMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
-    await client.v1.createMediaMetadata(citizenMapMediaId, { alt_text: { text: `A photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
-    media_ids.push(citizenMapMediaId);
+    if (!argv.dryRun) {
+        // Upload map images and add alt text
+        const citizenMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
+        await client.v1.createMediaMetadata(citizenMapMediaId, { alt_text: { text: `A photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
+        media_ids.push(citizenMapMediaId);
+    }
 
-    if (argv.tweetSatellite) {
+    if (argv.tweetSatellite && !argv.dryRun) {
         const satelliteMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}_satellite.png`);
         await client.v1.createMediaMetadata(satelliteMapMediaId, { alt_text: { text: `A satellite photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
         media_ids.push(satelliteMapMediaId);
@@ -153,7 +155,7 @@ const tweetIncidentThread = async (client, incident) => {
         tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
     }
 
-    await client.v2.tweetThread(tweets);
+    tweetThread(tweets);
 };
 
 /**
@@ -183,7 +185,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
         }
     }
 
-    await client.v2.tweetThread(tweets);
+    tweetThread(tweets);
 }
 
 /**
@@ -280,7 +282,17 @@ const validateInputs = () => {
     }
 }
 
+const tweetThread = async (tweets) => {
+    if (argv.dryRun) {
+        console.log(tweets)
+    } else {
+        await client.v2.tweetThread(tweets);
+    }
+}
+
 const main = async () => {
+    const delayTime = argv.dryRun ? 1000 : 60000;
+
     validateInputs()
 
     const client = new TwitterApi({
@@ -304,7 +316,7 @@ const main = async () => {
 
     for (const incident of filteredIncidents) {
         // wait one minute to prevent rate limiting
-        await delay(60000);
+        await delay(delayTime);
 
         await downloadMapImages(incident, incident.key);
 
