@@ -9,6 +9,9 @@ const turf = require('@turf/turf');
 const assert = require('node:assert/strict');
 
 const assetDirectory = `./assets-${argv.location}`;
+const summaryFile = `./summary-${argv.location}.json`;
+
+const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
 
 /**
  * Temporarily halts program execution.
@@ -106,7 +109,7 @@ const mapIncidentsToCityCouncilDistricts = (incidents) => {
                 ),
         }
     });
-}
+};
 
 /**
  * Deletes asset folder from disk, and then re-creates it.
@@ -167,7 +170,6 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
     const lf = new Intl.ListFormat('en');
     const numIncidents = incidents.length;
     let firstTweet = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash found over the last 24 hours.` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`;
-    const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
     const tweets = [firstTweet, disclaimerTweet];
 
     if (numIncidents > 0 && argv.tweetReps) {
@@ -186,7 +188,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
     }
 
     tweetThread(tweets);
-}
+};
 
 /**
  * Filters Citizen incidents and returns ones involving Pedestrian and Bicyclists.
@@ -280,7 +282,7 @@ const validateInputs = () => {
         assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
         assert.notEqual(representatives[argv.location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
     }
-}
+};
 
 const tweetThread = async (tweets) => {
     if (argv.dryRun) {
@@ -288,12 +290,64 @@ const tweetThread = async (tweets) => {
     } else {
         await client.v2.tweetThread(tweets);
     }
-}
+};
+
+const isLastDayOfMonth = (dateTime) => new Date(dateTime.getTime() + 86400000).getDate() === 1;
+
+const handleSummary = async (incidents) => {
+    await fs.ensureFileSync(summaryFile);
+
+    const tweets = [];
+    const summaryString = await fs.readFileSync(summaryFile, "utf8");
+    let summary;
+
+    if (summaryString.length === 0) {
+        summary = {
+            weekCount: 0,
+            monthCount: 0,
+        };
+    } else {
+        summary = JSON.parse(summaryString);
+    }
+
+    summary.weekCount += incidents.length
+    summary.monthCount += incidents.length
+
+    const today = new Date();
+
+    if (today.getDate() === 6) {
+        // Last day of the week
+        const summaryTweet = summary.weekCount !== 1 ? `There were ${summary.weekCount} crashes reported by this bot this week.` : `There was ${summary.weekCount} crash reported by this bot this week.`;
+        tweets.push("Weekly summary");
+        tweets.push(summaryTweet);
+
+        //tweet count
+        summary.weekCount = 0;
+    }
+
+    if (isLastDayOfMonth(today)) {
+        // Last day of month
+        const summaryTweet = summary.monthCount !== 1 ? `There were ${summary.monthCount} crashes reported by this bot this month.` : `There was ${summary.monthCount} crash reported by this bot this month.`
+        tweets.push("Monthly summary");
+        tweets.push(summaryTweet);
+
+        //tweet count
+        summary.monthCount = 0;
+    }
+
+    if (tweets.length > 0) {
+        tweets.push(disclaimerTweet);
+        
+        tweetThread(tweets);
+    }
+
+    await fs.writeFileSync(summaryFile, JSON.stringify(summary));
+};
 
 const main = async () => {
     const delayTime = argv.dryRun ? 1000 : 60000;
 
-    validateInputs()
+    validateInputs();
 
     const client = new TwitterApi({
         appKey: keys[argv.location].consumer_key,
@@ -321,6 +375,11 @@ const main = async () => {
         await downloadMapImages(incident, incident.key);
 
         await tweetIncidentThread(client, incident);
+    }
+
+    if (argv.summary) {
+        await delay(delayTime);
+        handleSummary(filteredIncidents);
     }
 };
 
