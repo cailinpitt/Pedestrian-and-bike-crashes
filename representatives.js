@@ -14,6 +14,6 @@ module.exports = {
     '10': '@AndreaBooneNow',
     '11': '@MarciOverstreet',
     '12': '@antoniolewisatl',
-    atLarge: ['@Michael_J_Bond', '@WestmorelandATL', '@WaitesKeisha', '@DougShipmanATL'],
+    atLarge: ['@Michael_J_Bond', '@WestmorelandATL', '@keisha_waites', '@DougShipmanATL'],
   },
 };
