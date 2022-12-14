@@ -158,7 +158,7 @@ const tweetIncidentThread = async (client, incident) => {
         tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
     }
 
-    tweetThread(tweets);
+    tweetThread(client, tweets);
 };
 
 /**
@@ -187,7 +187,7 @@ const tweetSummaryOfLast24Hours = async (client, incidents) => {
         }
     }
 
-    tweetThread(tweets);
+    tweetThread(client, tweets);
 };
 
 /**
@@ -284,7 +284,7 @@ const validateInputs = () => {
     }
 };
 
-const tweetThread = async (tweets) => {
+const tweetThread = async (client, tweets) => {
     if (argv.dryRun) {
         console.log(tweets)
     } else {
@@ -294,7 +294,7 @@ const tweetThread = async (tweets) => {
 
 const isLastDayOfMonth = (dateTime) => new Date(dateTime.getTime() + 86400000).getDate() === 1;
 
-const handleSummary = async (incidents) => {
+const handleSummary = async (client, incidents) => {
     await fs.ensureFileSync(summaryFile);
 
     const tweets = [];
@@ -338,7 +338,7 @@ const handleSummary = async (incidents) => {
     if (tweets.length > 0) {
         tweets.push(disclaimerTweet);
         
-        tweetThread(tweets);
+        tweetThread(client, tweets);
     }
 
     await fs.writeFileSync(summaryFile, JSON.stringify(summary));
@@ -379,7 +379,7 @@ const main = async () => {
 
     if (argv.summary) {
         await delay(delayTime);
-        handleSummary(filteredIncidents);
+        handleSummary(client, filteredIncidents);
     }
 };
 
