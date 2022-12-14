@@ -11,7 +11,21 @@ const assert = require('node:assert/strict');
 const assetDirectory = `./assets-${argv.location}`;
 const summaryFile = `./summary-${argv.location}.json`;
 
+const lf = new Intl.ListFormat('en');
+
 const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
+
+const capitalizeFirstWordInString = s => s && s[0].toUpperCase() + s.slice(1);
+
+const sortObjectPropertiesByValue = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+
+const districtsWithMostCrashes = (obj) => {
+    const sorted = sortObjectPropertiesByValue(obj);
+
+    return sorted.filter(district => district[1] === sorted[0][1]);
+};
+
+const isObjectEmpty = obj => Object.keys(obj).length === 0;
 
 /**
  * Temporarily halts program execution.
@@ -167,7 +181,6 @@ const tweetIncidentThread = async (client, incident) => {
  * @param {*} incidents the relevant Citizen incidents
  */
 const tweetSummaryOfLast24Hours = async (client, incidents) => {
-    const lf = new Intl.ListFormat('en');
     const numIncidents = incidents.length;
     let firstTweet = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash found over the last 24 hours.` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`;
     const tweets = [firstTweet, disclaimerTweet];
@@ -300,39 +313,87 @@ const handleSummary = async (client, incidents) => {
     const tweets = [];
     const summaryString = await fs.readFileSync(summaryFile, "utf8");
     let summary;
+    let innerInitialSummary = {
+        total: 0,
+    };
+
+    if (argv.summary === 'districts') {
+        innerInitialSummary = {
+            ...innerInitialSummary,
+            districts: {},
+        }
+    }
 
     if (summaryString.length === 0) {
         summary = {
-            weekCount: 0,
-            monthCount: 0,
+            week: innerInitialSummary,
+            month: innerInitialSummary,
         };
     } else {
         summary = JSON.parse(summaryString);
     }
 
-    summary.weekCount += incidents.length
-    summary.monthCount += incidents.length
+    summary.week.total += incidents.length
+    summary.month.total += incidents.length
+
+    if (argv.summary === 'districts') {
+        for (const incident of incidents) {
+            if (argv.tweetReps && incident.cityCouncilDistrict) {
+                if (summary.week.districts[incident.cityCouncilDistrict]) {
+                    summary.week.districts[incident.cityCouncilDistrict] += 1;
+                } else {
+                    summary.week.districts[incident.cityCouncilDistrict] = 1;
+                }
+
+                if (summary.month.districts[incident.cityCouncilDistrict]) {
+                    summary.month.districts[incident.cityCouncilDistrict] += 1;
+                } else {
+                    summary.month.districts[incident.cityCouncilDistrict] = 1;
+                }
+            }
+        }
+    }
 
     const today = new Date();
 
-    if (today.getDate() === 6) {
+    if (today.getDay() === 6) {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - 6);
+
         // Last day of the week
-        const summaryTweet = summary.weekCount !== 1 ? `There were ${summary.weekCount} crashes reported by this bot this week.` : `There was ${summary.weekCount} crash reported by this bot this week.`;
+        const summaryTweet = summary.week.total !== 1 ? `There were ${summary.week.total} crashes reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.` : `There was ${summary.week.total} crash reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.`;
         tweets.push("Weekly summary");
         tweets.push(summaryTweet);
 
-        //tweet count
-        summary.weekCount = 0;
+        if (argv.summary === 'districts' && summary.week.districts && !isObjectEmpty(summary.week.districts)) {
+            let districts = districtsWithMostCrashes(summary.week.districts);
+            let districtNames = districts.map(district => district[0]);
+
+            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which are the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which is the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.`;
+
+            tweets.push(districtTweet);
+        }
+
+        summary.week = innerInitialSummary;
     }
 
     if (isLastDayOfMonth(today)) {
         // Last day of month
-        const summaryTweet = summary.monthCount !== 1 ? `There were ${summary.monthCount} crashes reported by this bot this month.` : `There was ${summary.monthCount} crash reported by this bot this month.`
+        const monthName = today.toLocaleString('default', { month: 'long' });
+        const summaryTweet = summary.month.total !== 1 ? `There were ${summary.month.total} crashes reported by this bot citywide during ${monthName}.` : `There was ${summary.month.total} crash reported by this bot citywide during ${monthName}.`
         tweets.push("Monthly summary");
         tweets.push(summaryTweet);
 
-        //tweet count
-        summary.monthCount = 0;
+        if (argv.summary === 'districts' && summary.month.districts && !isObjectEmpty(summary.month.districts)) {
+            let districts = districtsWithMostCrashes(summary.month.districts);
+            let districtNames = districts.map(district => district[0]);
+
+            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which are the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which is the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.`;
+
+            tweets.push(districtTweet);
+        }
+
+        summary.month = innerInitialSummary;
     }
 
     if (tweets.length > 0) {
