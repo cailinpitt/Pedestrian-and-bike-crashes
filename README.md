@@ -49,6 +49,12 @@ The `timeZone` value is used for converting incident times (Citizen stores them 
 ---
 
 ### Advanced
+#### Weekly and monthly summary
+The bot can tweet weekly and monthly summaries of the number of incidents it reported, on the last day of the week and month. Use the `--summary` flag when running the bot. It will create a `summary-cityName.json` file it will use to keep track of these numbers and report.
+
+#### Dry Run
+Use the `--dryRun` flag to print all tweets to the console instead of posting on Twitter.
+
 #### Satellite image of crash site
 The bot can tweet zoomed in satellite images of the crash site, in addition to the standard citizen map. To enable this, you'll first need to add a `googleKey` property to your city object in the `keys.js` file containing an API key from a [Google Developer Platform account](https://developers.google.com/maps/documentation/maps-static/get-api-key). Example:
 
