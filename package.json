@@ -4,7 +4,7 @@
   "description": "Twitter both that tweets incidents involving pedestrians and bicyclists",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
@@ -22,7 +22,12 @@
     "fs-extra": "^10.1.0",
     "minimist": "^1.2.6",
     "path": "^0.12.7",
-    "twitter": "^1.7.1",
     "twitter-api-v2": "^1.12.2"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0",
+    "rewire": "^6.0.0",
+    "sinon": "^15.0.1"
   }
 }
