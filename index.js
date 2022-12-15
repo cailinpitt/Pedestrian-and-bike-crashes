@@ -1,5 +1,12 @@
 const keys = require('./keys.js');
 const representatives = require('./representatives.js');
+const { 
+    capitalizeFirstWordInString,
+    delay,
+    isLastDayOfMonth,
+    isObjectEmpty,
+    sortObjectPropertiesByValue,
+} = require('./helpers.js');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs-extra');
@@ -15,24 +22,11 @@ const lf = new Intl.ListFormat('en');
 
 const disclaimerTweet = 'Disclaimer: This bot only tweets incidents called into 911, and this data is not representative of all crashes that may have occurred.';
 
-const capitalizeFirstWordInString = s => s && s[0].toUpperCase() + s.slice(1);
-
-const sortObjectPropertiesByValue = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
-
 const districtsWithMostCrashes = (obj) => {
     const sorted = sortObjectPropertiesByValue(obj);
 
     return sorted.filter(district => district[1] === sorted[0][1]);
 };
-
-const isObjectEmpty = obj => Object.keys(obj).length === 0;
-
-/**
- * Temporarily halts program execution.
- * @param {Number} ms number of miliseconds to wait
- * @returns promise
- */
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Makes a GET request to Citizen to fetch 200 recent incidents. Using 200 because I think that
@@ -304,8 +298,6 @@ const tweetThread = async (client, tweets) => {
         await client.v2.tweetThread(tweets);
     }
 };
-
-const isLastDayOfMonth = (dateTime) => new Date(dateTime.getTime() + 86400000).getDate() === 1;
 
 const handleSummary = async (client, incidents) => {
     await fs.ensureFileSync(summaryFile);
