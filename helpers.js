@@ -1,4 +1,3 @@
-
 /**
  * Capitalizes the first letter in a string.
  * @param {String} s 

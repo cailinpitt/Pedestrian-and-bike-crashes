@@ -33,11 +33,8 @@ const districtsWithMostCrashes = (obj) => {
  * shgould be a high enough limit to grab all incidents for a given day.
  * @returns JSON list of incidents.
  */
-const fetchIncidents = async () => {
-    const response = await axios({
-        url: `https://citizen.com/api/incident/trending?lowerLatitude=${keys[argv.location].lowerLatitude}&lowerLongitude=${keys[argv.location].lowerLongitude}&upperLatitude=${keys[argv.location].upperLatitude}&upperLongitude=${keys[argv.location].upperLongitude}&fullResponse=true&limit=200`,
-        method: 'GET',
-    });
+const fetchIncidents = async (lowerLatitude, lowerLongitude, upperLatitude, upperLongitude) => {
+    const response = await axios.get(`https://citizen.com/api/incident/trending?lowerLatitude=${lowerLatitude}&lowerLongitude=${lowerLongitude}&upperLatitude=${upperLatitude}&upperLongitude=${upperLongitude}&fullResponse=true&limit=200`);
 
     return response.data.results;
 };
@@ -51,11 +48,7 @@ const fetchIncidents = async () => {
     const geojsonPath = path.resolve(__dirname, `${assetDirectory}/city_council_districts.geojson`);
     const writer = fs.createWriteStream(geojsonPath);
 
-    const response = await axios({
-        url,
-        method: 'GET',
-        responseType: 'stream'
-    });
+    const response = await axios.get(url, { responseType: 'stream' });
     
     return new Promise(resolve => response.data.pipe(writer).on('finish', resolve));
 };
@@ -66,20 +59,16 @@ const fetchIncidents = async () => {
  * @param {String} eventKey the ID of the citizen incident
  * @returns resolved promise.
  */
-const downloadMapImages = async (incident, eventKey) => {
+const downloadMapImages = async (incident, eventKey, tweetSatellite, location) => {
     const citizenMapImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}.png`);
     const citizenMapWriter = fs.createWriteStream(citizenMapImagePath);
-    const citizenMapResponse = await axios({
-        url: incident.shareMap,
-        method: 'GET',
-        responseType: 'stream',
-    });
+    const citizenMapResponse = await axios.get(incident.shareMap, { responseType: 'stream' });
 
-    if (argv.tweetSatellite && keys[argv.location].googleKey) {
+    if (tweetSatellite && keys[location].googleKey) {
         const googleSatelliteImagePath = path.resolve(__dirname, `${assetDirectory}/${eventKey}_satellite.png`);
         const googleSatelliteWriter = fs.createWriteStream(googleSatelliteImagePath);
         const googleSatelliteResponse = await axios({
-            url: `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=${keys[argv.location].googleKey}`,
+            url: `https://maps.googleapis.com/maps/api/staticmap?center=${incident.latitude},${incident.longitude}&size=500x500&zoom=20&maptype=hybrid&scale=2&key=${keys[location].googleKey}`,
             method: 'GET',
             responseType: 'stream',
         });
@@ -132,19 +121,19 @@ const resetAssetsFolder = () => {
  * @param {*} client the instantiated Twitter client
  * @param {*} incident the Citizen incident to tweet
  */
-const tweetIncidentThread = async (client, incident) => {
-    const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
+const tweetIncidentThread = async (client, incident, dryRun, tweetReps, tweetSatellite, location) => {
+    const incidentDate = new Date(incident.ts).toLocaleString('en-US', { timeZone: keys[location].timeZone});
     const tweets = [];
     const media_ids = [];
 
-    if (!argv.dryRun) {
+    if (!dryRun) {
         // Upload map images and add alt text
         const citizenMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}.png`);
         await client.v1.createMediaMetadata(citizenMapMediaId, { alt_text: { text: `A photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
         media_ids.push(citizenMapMediaId);
     }
 
-    if (argv.tweetSatellite && !argv.dryRun) {
+    if (tweetSatellite && !dryRun) {
         const satelliteMapMediaId = await client.v1.uploadMedia(`${assetDirectory}/${incident.key}_satellite.png`);
         await client.v1.createMediaMetadata(satelliteMapMediaId, { alt_text: { text: `A satellite photo of a map at ${incident.address}. Coordinates: ${incident.latitude}, ${incident.longitude}` } });
         media_ids.push(satelliteMapMediaId);
@@ -156,17 +145,17 @@ const tweetIncidentThread = async (client, incident) => {
 
     for (const updateKey in incident.updates) {
         if (incident.updates[updateKey].type != 'ROOT') {
-            const updateTime = new Date(incident.updates[updateKey].ts).toLocaleString('en-US', { timeZone: keys[argv.location].timeZone});
+            const updateTime = new Date(incident.updates[updateKey].ts).toLocaleString('en-US', { timeZone: keys[location].timeZone});
             tweets.push(`${incident.updates[updateKey].text}\n\n${updateTime}`)
         }
     }
 
-    if (argv.tweetReps && representatives[argv.location][incident.cityCouncilDistrict] && incident.cityCouncilDistrict) {
-        const representative = representatives[argv.location][incident.cityCouncilDistrict];
-        tweets.push(`This incident occurred in ${representatives[argv.location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
+    if (tweetReps && representatives[location][incident.cityCouncilDistrict] && incident.cityCouncilDistrict) {
+        const representative = representatives[location][incident.cityCouncilDistrict];
+        tweets.push(`This incident occurred in ${representatives[location].repesentativeDistrictTerm} ${incident.cityCouncilDistrict}. \n\nRepresentative: ${representative}`)
     }
 
-    tweetThread(client, tweets);
+    tweetThread(client, tweets, dryRun);
 };
 
 /**
@@ -174,27 +163,27 @@ const tweetIncidentThread = async (client, incident) => {
  * @param {*} client the instantiated Twitter client
  * @param {*} incidents the relevant Citizen incidents
  */
-const tweetSummaryOfLast24Hours = async (client, incidents) => {
+const tweetSummaryOfLast24Hours = async (client, incidents, tweetReps, location, dryRun) => {
     const numIncidents = incidents.length;
     let firstTweet = numIncidents === 1 ? `There was ${numIncidents} Bicyclist and Pedestrian related crash found over the last 24 hours.` : `There were ${numIncidents} Bicyclist and Pedestrian related crashes found over the last 24 hours.`;
     const tweets = [firstTweet, disclaimerTweet];
 
-    if (numIncidents > 0 && argv.tweetReps) {
-        if (argv.tweetReps) {
+    if (numIncidents > 0 && tweetReps) {
+        if (tweetReps) {
             const districts = [...new Set(incidents.map(x => x.cityCouncilDistrict))].sort();
             const districtSentenceStart = numIncidents === 1 ? 'The crash occurred in' : 'The crashes occurred in';
-            const districtSentenceEnd = districts.length === 1 ? `${representatives[argv.location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[argv.location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
+            const districtSentenceEnd = districts.length === 1 ? `${representatives[location].repesentativeDistrictTerm} ${lf.format(districts)}` : `${representatives[location].repesentativeDistrictTerm}s ${lf.format(districts)}`;
             
             tweets[0] = `${firstTweet}\n\n${districtSentenceStart} ${districtSentenceEnd}.`;
         }
 
-        if (argv.tweetReps && representatives[argv.location].atLarge) {
-            const atLargeRepInfo = representatives[argv.location].atLarge;
+        if (tweetReps && representatives[location].atLarge) {
+            const atLargeRepInfo = representatives[location].atLarge;
             tweets.push(`At large city council representatives and president: ${lf.format(atLargeRepInfo)}`);
         }
     }
 
-    tweetThread(client, tweets);
+    tweetThread(client, tweets, dryRun);
 };
 
 /**
@@ -243,6 +232,8 @@ const filterIncidents = (allIncidents) => {
                     return false;
                 }
             }
+
+            return true;
         });
 
     // Get incidents from the last 24 hours with pedestrian or bicyuclist in an update
@@ -276,40 +267,40 @@ const filterIncidents = (allIncidents) => {
     return Array.from(new Set([...relevantIncidents, ...incidentsWithRelevantUpdates]));
 };
 
-const validateInputs = () => {
-    assert.notEqual(argv.location, undefined, 'location must be passed in');
-    assert.notEqual(keys[argv.location], undefined, 'keys file must have location information');
+const validateInputs = (location, tweetSatellite, tweetReps) => {
+    assert.notEqual(location, undefined, 'location must be passed in');
+    assert.notEqual(keys[location], undefined, 'keys file must have location information');
     
-    if (argv.tweetSatellite) {
-        assert.notEqual(keys[argv.location].googleKey, undefined, 'keys file must contain googleKey for location if calling with tweetSatellite flag');
+    if (tweetSatellite) {
+        assert.notEqual(keys[location].googleKey, undefined, 'keys file must contain googleKey for location if calling with tweetSatellite flag');
     }
 
-    if (argv.tweetReps) {
-        assert.notEqual(representatives[argv.location], undefined, 'must have representative info for location if calling with tweetReps flag');
-        assert.notEqual(representatives[argv.location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
-        assert.notEqual(representatives[argv.location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
+    if (tweetReps) {
+        assert.notEqual(representatives[location], undefined, 'must have representative info for location if calling with tweetReps flag');
+        assert.notEqual(representatives[location].geojsonUrl, undefined, 'must have geojsonUrl set so incidents can be mapped to representative districts if calling with tweetReps flag');
+        assert.notEqual(representatives[location].repesentativeDistrictTerm, undefined, 'must have repesentativeDistrictTerm set if calling with tweetReps flag');
     }
 };
 
-const tweetThread = async (client, tweets) => {
-    if (argv.dryRun) {
+const tweetThread = async (client, tweets, dryRun) => {
+    if (dryRun) {
         console.log(tweets)
     } else {
         await client.v2.tweetThread(tweets);
     }
 };
 
-const handleSummary = async (client, incidents) => {
+const handleSummary = async (client, incidents, summary, tweetReps, dryRun, location) => {
     await fs.ensureFileSync(summaryFile);
 
     const tweets = [];
     const summaryString = await fs.readFileSync(summaryFile, "utf8");
-    let summary;
+    let summaryObj;
     let innerInitialSummary = {
         total: 0,
     };
 
-    if (argv.summary === 'districts') {
+    if (summary === 'districts') {
         innerInitialSummary = {
             ...innerInitialSummary,
             districts: {},
@@ -317,30 +308,30 @@ const handleSummary = async (client, incidents) => {
     }
 
     if (summaryString.length === 0) {
-        summary = {
+        summaryObj = {
             week: innerInitialSummary,
             month: innerInitialSummary,
         };
     } else {
-        summary = JSON.parse(summaryString);
+        summaryObj = JSON.parse(summaryString);
     }
 
-    summary.week.total += incidents.length
-    summary.month.total += incidents.length
+    summaryObj.week.total += incidents.length
+    summaryObj.month.total += incidents.length
 
-    if (argv.summary === 'districts') {
+    if (summary === 'districts') {
         for (const incident of incidents) {
-            if (argv.tweetReps && incident.cityCouncilDistrict) {
-                if (summary.week.districts[incident.cityCouncilDistrict]) {
-                    summary.week.districts[incident.cityCouncilDistrict] += 1;
+            if (tweetReps && incident.cityCouncilDistrict) {
+                if (summaryObj.week.districts[incident.cityCouncilDistrict]) {
+                    summaryObj.week.districts[incident.cityCouncilDistrict] += 1;
                 } else {
-                    summary.week.districts[incident.cityCouncilDistrict] = 1;
+                    summaryObj.week.districts[incident.cityCouncilDistrict] = 1;
                 }
 
-                if (summary.month.districts[incident.cityCouncilDistrict]) {
-                    summary.month.districts[incident.cityCouncilDistrict] += 1;
+                if (summaryObj.month.districts[incident.cityCouncilDistrict]) {
+                    summaryObj.month.districts[incident.cityCouncilDistrict] += 1;
                 } else {
-                    summary.month.districts[incident.cityCouncilDistrict] = 1;
+                    summaryObj.month.districts[incident.cityCouncilDistrict] = 1;
                 }
             }
         }
@@ -353,54 +344,54 @@ const handleSummary = async (client, incidents) => {
         startOfWeek.setDate(today.getDate() - 6);
 
         // Last day of the week
-        const summaryTweet = summary.week.total !== 1 ? `There were ${summary.week.total} crashes reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.` : `There was ${summary.week.total} crash reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.`;
+        const summaryTweet = summaryObj.week.total !== 1 ? `There were ${summaryObj.week.total} crashes reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.` : `There was ${summaryObj.week.total} crash reported by this bot citywide during the week of ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()}.`;
         tweets.push("Weekly summary");
         tweets.push(summaryTweet);
 
-        if (argv.summary === 'districts' && summary.week.districts && !isObjectEmpty(summary.week.districts)) {
-            let districts = districtsWithMostCrashes(summary.week.districts);
+        if (summary === 'districts' && summaryObj.week.districts && !isObjectEmpty(summaryObj.week.districts)) {
+            let districts = districtsWithMostCrashes(summaryObj.week.districts);
             let districtNames = districts.map(district => district[0]);
 
-            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which are the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which is the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.`;
+            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which are the highest of all ${representatives[location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported this week, which is the highest of all ${representatives[location].repesentativeDistrictTerm}s.`;
 
             tweets.push(districtTweet);
         }
 
-        summary.week = innerInitialSummary;
+        summaryObj.week = innerInitialSummary;
     }
 
     if (isLastDayOfMonth(today)) {
         // Last day of month
         const monthName = today.toLocaleString('default', { month: 'long' });
-        const summaryTweet = summary.month.total !== 1 ? `There were ${summary.month.total} crashes reported by this bot citywide during ${monthName}.` : `There was ${summary.month.total} crash reported by this bot citywide during ${monthName}.`
+        const summaryTweet = summaryObj.month.total !== 1 ? `There were ${summaryObj.month.total} crashes reported by this bot citywide during ${monthName}.` : `There was ${summaryObj.month.total} crash reported by this bot citywide during ${monthName}.`
         tweets.push("Monthly summary");
         tweets.push(summaryTweet);
 
-        if (argv.summary === 'districts' && summary.month.districts && !isObjectEmpty(summary.month.districts)) {
-            let districts = districtsWithMostCrashes(summary.month.districts);
+        if (summary === 'districts' && summaryObj.month.districts && !isObjectEmpty(summaryObj.month.districts)) {
+            let districts = districtsWithMostCrashes(summaryObj.month.districts);
             let districtNames = districts.map(district => district[0]);
 
-            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which are the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[argv.location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which is the highest of all ${representatives[argv.location].repesentativeDistrictTerm}s.`;
+            const districtTweet = districtNames.length !== 1 ? `${capitalizeFirstWordInString(representatives[location].repesentativeDistrictTerm)}s ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which are the highest of all ${representatives[location].repesentativeDistrictTerm}s.` : `${capitalizeFirstWordInString(representatives[location].repesentativeDistrictTerm)} ${lf.format(districtNames)} had a total of ${districts[0][1]} crashes reported during ${monthName}, which is the highest of all ${representatives[location].repesentativeDistrictTerm}s.`;
 
             tweets.push(districtTweet);
         }
 
-        summary.month = innerInitialSummary;
+        summaryObj.month = innerInitialSummary;
     }
 
     if (tweets.length > 0) {
         tweets.push(disclaimerTweet);
         
-        tweetThread(client, tweets);
+        tweetThread(client, tweets, dryRun);
     }
 
-    await fs.writeFileSync(summaryFile, JSON.stringify(summary));
+    await fs.writeFileSync(summaryFile, JSON.stringify(summaryObj));
 };
 
 const main = async () => {
     const delayTime = argv.dryRun ? 1000 : 60000;
 
-    validateInputs();
+    validateInputs(argv.location, argv.tweetSatellite, argv.tweetReps);
 
     const client = new TwitterApi({
         appKey: keys[argv.location].consumer_key,
@@ -411,7 +402,12 @@ const main = async () => {
 
     resetAssetsFolder();
 
-    const allIncidents = await fetchIncidents();
+    const allIncidents = await fetchIncidents(
+        keys[argv.location].lowerLatitude,
+        keys[argv.location].lowerLongitude,
+        keys[argv.location].upperLatitude,
+        keys[argv.location].upperLongitude,
+    );
     let filteredIncidents = filterIncidents(allIncidents);
 
     if (argv.tweetReps) {
@@ -419,20 +415,20 @@ const main = async () => {
         filteredIncidents = mapIncidentsToCityCouncilDistricts(filteredIncidents);
     }
 
-    await tweetSummaryOfLast24Hours(client, filteredIncidents);
+    await tweetSummaryOfLast24Hours(client, filteredIncidents, argv.tweetReps, argv.location, argv.dryRun);
 
     for (const incident of filteredIncidents) {
         // wait one minute to prevent rate limiting
         await delay(delayTime);
 
-        await downloadMapImages(incident, incident.key);
+        await downloadMapImages(incident, incident.key, argv.tweetSatellite, argv.location);
 
-        await tweetIncidentThread(client, incident);
+        await tweetIncidentThread(client, incident, argv.dryRun, argv.tweetReps, argv.tweetSatellite, argv.location);
     }
 
     if (argv.summary) {
         await delay(delayTime);
-        handleSummary(client, filteredIncidents);
+        handleSummary(client, filteredIncidents, argv.summary, argv.tweetReps, argv.dryRun, argv.location);
     }
 };
 
